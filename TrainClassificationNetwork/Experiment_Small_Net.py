@@ -5,14 +5,18 @@ import torch
 from torch import nn
 from torch import optim
 
+import time
+
 TRAINING_SET = "/home/martin/Forschungspraktikum/Testdaten/Sets/equalized_set/traindata.txt"
 VALIDATION_SET = "/home/martin/Forschungspraktikum/Testdaten/Sets/equalized_set/validationdata.txt"
 TEST_SET = "/home/martin/Forschungspraktikum/Testdaten/Sets/equalized_set/testdata.txt"
 
-BATCH_SIZE = 64
+BATCH_SIZE = 128
 
 
 def main():
+	t0 = time.time()
+
 	# Load with self written FIle loader
 	training_data = ImageFilelist('.', TRAINING_SET)
 	validation_data = ImageFilelist('.', VALIDATION_SET)
@@ -40,11 +44,13 @@ def main():
 	optimizer = optim.Adam(resnet18.fc.parameters(), lr=0.003)
 	resnet18.to(device)
 
-	epochs = 100
+	epochs = 7
 	steps = 0
 	running_loss = 0
-	print_every = 1
+	print_every = 10
 	train_losses, validation_losses = [], []
+
+	t1 = time.time()
 
 	for epoch in range(epochs):
 		for inputs, labels in trainloader:
@@ -75,7 +81,8 @@ def main():
 				train_losses.append(running_loss/len(trainloader))
 				validation_losses.append(validation_loss/len(validationloader))
 
-				print(f"Epoch {epoch+1}/{epochs}.. Train loss: {running_loss/print_every:.3f}.. "
+				t2 = time.time()
+				print(f" {t2-t0} - Epoch {epoch+1}/{epochs}.. Train loss: {running_loss/print_every:.3f}.. "
 				      f"Test loss: {validation_loss/len(validationloader):.3f}.. Test accuracy: {accuracy/len(validationloader):.3f}")
 
 				running_loss = 0
