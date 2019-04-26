@@ -2,13 +2,11 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="b4b983c2-a671-4936-8774-f742f31f2cab" name="Default" comment="">
-      <change afterPath="$PROJECT_DIR$/../ExtractFromTranscribus/DownloadTranscribusData.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../ExtractFromTranscribus/DownloadXMLData.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../ExtractFromTranscribus/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/../ExtractFromTranscribus/xmlpage_segmenter.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../DefineSets/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../DefineSets/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Experiment_Small_Net.py" beforeDir="false" afterPath="$PROJECT_DIR$/Experiment_Small_Net.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../UNet/helper.py" beforeDir="false" afterPath="$PROJECT_DIR$/../UNet/helper.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../UNet/loss.py" beforeDir="false" afterPath="$PROJECT_DIR$/../UNet/loss.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../UNet/pytorch_unet.py" beforeDir="false" afterPath="$PROJECT_DIR$/../UNet/pytorch_unet.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../UNet/simulation.py" beforeDir="false" afterPath="$PROJECT_DIR$/../UNet/simulation.py" afterDir="false" />
     </list>
     <ignored path="TrainClassificationNetwork.iws" />
     <ignored path=".idea/workspace.xml" />
@@ -145,10 +143,11 @@
       </list>
     </option>
   </component>
-  <component name="ProjectFrameBounds" extendedState="6">
-    <option name="x" value="648" />
-    <option name="width" value="1262" />
-    <option name="height" value="689" />
+  <component name="ProjectFrameBounds">
+    <option name="x" value="467" />
+    <option name="y" value="136" />
+    <option name="width" value="1252" />
+    <option name="height" value="688" />
   </component>
   <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
   <component name="ProjectView">
@@ -290,9 +289,10 @@
     <servers />
   </component>
   <component name="ToolWindowManager">
-    <frame x="-4" y="0" width="1928" height="1046" extended-state="6" />
+    <frame x="467" y="136" width="1252" height="688" extended-state="0" />
+    <editor active="true" />
     <layout>
-      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.16341592" />
+      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.2522376" />
       <window_info id="Structure" order="1" weight="0.25" />
       <window_info id="Favorites" order="2" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="0" />

@@ -42,29 +42,47 @@ def main():
                         help='output-types')
     args = parser.parse_args()
 
+    xml_file = args.xmlfile
+    region_type = args.type
+    img_folder = args.imgfolder
+    suffix = args.suffix
+    label_file = args.labelfile
+    out_folder = args.outfolder
+    output = args.output
+    binarize = args.binarize
+
+    create_UNet_training_images(xml_file, region_type, img_folder, suffix, label_file, out_folder, output, binarize)
+
+
+def create_UNet_training_images(xml_file, region_type, img_folder, suffix, label_file, out_folder, output, binarize):
+
+    out_filename = None
+
     # Parse the XML File
-    tree = ET.parse(args.xmlfile)
+    tree = ET.parse(xml_file)
     root = tree.getroot()
 
     # Use this Schema
     ns = '{http://schema.primaresearch.org/PAGE/gts/pagecontent/2013-07-15}'
 
-    els = root.findall('*/' + ns + args.type)
+    els = root.findall('*/' + ns + region_type)
     print(els)
 
     if len(els) == 0:
         print('no element found -> try to go into TextRegion')
         elss = root.find(ns + 'Page')
         for el in elss.iter(ns + 'TextRegion'):
-            for ele in el.iter(ns + args.type):
+            for ele in el.iter(ns + region_type):
                 els.append(ele)
         if len(els) == 0:
             print('still no element found')
-            sys.exit(1)
+            raise Exception(
+                f"No label found for {xml_file}"
+            )
 
     # Get an imagename for input and read the image
-    img_basename = os.path.splitext(os.path.basename(args.xmlfile))[0]
-    img_filename = os.path.join(args.imgfolder, img_basename) + args.suffix
+    img_basename = os.path.splitext(os.path.basename(xml_file))[0]
+    img_filename = os.path.join(img_folder, img_basename) + suffix
     img = cv2.imread(img_filename)
     print('image type:', img.dtype)
 
@@ -73,18 +91,18 @@ def main():
         raise ValueError('cannot read image: {}'.format(img_filename))
 
     # Exit if there is no output folder
-    if not os.path.exists(args.outfolder):
-        mkdir_p(args.outfolder)
+    if not os.path.exists(out_folder):
+        mkdir_p(out_folder)
 
     # Label for the snippet
-    label_base = os.path.splitext(args.labelfile)[0]
+    label_base = os.path.splitext(label_file)[0]
     labelfile_snip = open(label_base + '_snippet.txt', 'a+')
 
     out_mask = out_image = None
-    if 'mask' in args.output:
+    if 'mask' in output:
         out_mask = np.zeros((img.shape[0], img.shape[1]), np.uint8)
-    if 'image' in args.output:
-        if args.binarize:
+    if 'image' in output:
+        if binarize:
             out_image = np.ones((img.shape[0], img.shape[1]), np.uint8) * 255
         else:
             out_image = np.ones(img.shape, np.uint8) * 255
@@ -95,29 +113,31 @@ def main():
         print(idd)
         points = element.find(ns + 'Coords').get('points')
         print(points)
-        if 'mask' in args.output or 'image' in args.output:
+        if 'mask' in output or 'image' in output:
             snippet, out_mask, out_image = cut_snippet(img, points, True, mark_matrix=out_mask,
-                                                       out_image=out_image, binarize=args.binarize)
+                                                       out_image=out_image, binarize=binarize)
         else:
-            snippet, _, _ = cut_snippet(img, points, binarize=args.binarize)
+            snippet, _, _ = cut_snippet(img, points, binarize=binarize)
 
-        if 'snippet' in args.output:
-            snippet_filename = os.path.join(args.outfolder, img_basename + '_' + idd + '.png')
+        if 'snippet' in output:
+            snippet_filename = os.path.join(out_folder, img_basename + '_' + idd + '.png')
             print('write {}'.format(snippet_filename))
             cv2.imwrite(snippet_filename, snippet)
 
             labelfile_snip.write('{} {}\n'.format(img_basename + '_' + idd, img_basename))
 
-    if 'mask' in args.output:
-        out_filename = os.path.join(args.outfolder, img_basename + '_mask.png')
+    if 'mask' in output:
+        out_filename = os.path.join(out_folder, img_basename + '_mask.png')
         print('write {}'.format(out_filename))
         cv2.imwrite(out_filename, 255 * out_mask)
-    if 'image' in args.output:
-        out_filename = os.path.join(args.outfolder, img_basename + '_masked.png')
+    if 'image' in output:
+        out_filename = os.path.join(out_folder, img_basename + '_masked.png')
         print('write {}'.format(out_filename))
         cv2.imwrite(out_filename, out_image)
 
     labelfile_snip.close()
+
+    return out_filename
 
 
 def mkdir_p(path):
@@ -126,7 +146,9 @@ def mkdir_p(path):
     except OSError as exc:
         if exc.errno == errno.EEXIST:
             pass
-        else: raise
+        else:
+            raise
+
 
 def cut_snippet(img, point_string, 
                 use_mask=False, 

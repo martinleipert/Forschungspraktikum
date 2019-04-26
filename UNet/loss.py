@@ -1,6 +1,20 @@
 import torch
 import torch.nn as nn
 
+"""
+
+Original implementation taken from
+https://github.com/usuyama/pytorch-unet
+
+modified by 
+Martin Leipert
+martin.leipert@t-online.de
+
+"""
+
+
+# Dice Loss
+# Correlation between prediction and reference
 def dice_loss(pred, target, smooth = 1.):
     pred = pred.contiguous()
     target = target.contiguous()    
@@ -10,3 +24,5 @@ def dice_loss(pred, target, smooth = 1.):
     loss = (1 - ((2. * intersection + smooth) / (pred.sum(dim=2).sum(dim=2) + target.sum(dim=2).sum(dim=2) + smooth)))
     
     return loss.mean()
+
+# TODO Implement modified dice loss which weights the border less then the center

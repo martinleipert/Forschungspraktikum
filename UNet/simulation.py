@@ -1,6 +1,20 @@
 import numpy as np
 import random
 
+"""
+
+Original implementation taken from
+https://github.com/usuyama/pytorch-unet
+
+modified by 
+Martin Leipert
+martin.leipert@t-online.de
+
+Skript for random image generation for segmentation
+
+"""
+
+
 def generate_random_data(height, width, count):
     x, y = zip(*[generate_img_and_mask(height, width) for i in range(0, count)])
 
@@ -9,6 +23,7 @@ def generate_random_data(height, width, count):
     Y = np.asarray(y)
 
     return X, Y
+
 
 def generate_img_and_mask(height, width):
     shape = (height, width)
@@ -43,6 +58,37 @@ def generate_img_and_mask(height, width):
 
     return arr, masks
 
+
+def logical_and(arrays):
+    new_array = np.ones(arrays[0].shape, dtype=bool)
+    for a in arrays:
+        new_array = np.logical_and(new_array, a)
+
+    return new_array
+
+
+def get_random_location(width, height, zoom=1.0):
+    x = int(width * random.uniform(0.1, 0.9))
+    y = int(height * random.uniform(0.1, 0.9))
+
+    size = int(min(width, height) * random.uniform(0.06, 0.12) * zoom)
+
+    return x, y, size
+
+
+"""
+    Forms for the drawings
+"""
+
+
+def add_mesh_square(arr, x, y, size):
+    s = int(size / 2)
+
+    xx, yy = np.mgrid[:arr.shape[0], :arr.shape[1]]
+
+    return np.logical_or(arr, logical_and([xx > x - s, xx < x + s, xx % 2 == 1, yy > y - s, yy < y + s, yy % 2 == 1]))
+
+
 def add_square(arr, x, y, size):
     s = int(size / 2)
     arr[x-s,y-s:y+s] = True
@@ -52,6 +98,7 @@ def add_square(arr, x, y, size):
 
     return arr
 
+
 def add_filled_square(arr, x, y, size):
     s = int(size / 2)
 
@@ -59,19 +106,6 @@ def add_filled_square(arr, x, y, size):
 
     return np.logical_or(arr, logical_and([xx > x - s, xx < x + s, yy > y - s, yy < y + s]))
 
-def logical_and(arrays):
-    new_array = np.ones(arrays[0].shape, dtype=bool)
-    for a in arrays:
-        new_array = np.logical_and(new_array, a)
-
-    return new_array
-
-def add_mesh_square(arr, x, y, size):
-    s = int(size / 2)
-
-    xx, yy = np.mgrid[:arr.shape[0], :arr.shape[1]]
-
-    return np.logical_or(arr, logical_and([xx > x - s, xx < x + s, xx % 2 == 1, yy > y - s, yy < y + s, yy % 2 == 1]))
 
 def add_triangle(arr, x, y, size):
     s = int(size / 2)
@@ -82,6 +116,7 @@ def add_triangle(arr, x, y, size):
 
     return arr
 
+
 def add_circle(arr, x, y, size, fill=False):
     xx, yy = np.mgrid[:arr.shape[0], :arr.shape[1]]
     circle = np.sqrt((xx - x) ** 2 + (yy - y) ** 2)
@@ -89,17 +124,10 @@ def add_circle(arr, x, y, size, fill=False):
 
     return new_arr
 
+
 def add_plus(arr, x, y, size):
     s = int(size / 2)
     arr[x-1:x+1,y-s:y+s] = True
     arr[x-s:x+s,y-1:y+1] = True
 
     return arr
-
-def get_random_location(width, height, zoom=1.0):
-    x = int(width * random.uniform(0.1, 0.9))
-    y = int(height * random.uniform(0.1, 0.9))
-
-    size = int(min(width, height) * random.uniform(0.06, 0.12) * zoom)
-
-    return (x, y, size)

@@ -11,6 +11,7 @@ import re
 
 Image.LOAD_TRUNCATED_IMAGES = True
 
+
 def default_loader(path):
 
 	image = Image.open(path)
@@ -23,6 +24,7 @@ def default_loader(path):
 
 	return image.convert('RGB')
 
+
 def scale_loader(path):
 
 	image = default_loader(path)
@@ -32,6 +34,7 @@ def scale_loader(path):
 	trans3 = transforms.ToTensor()
 	image = trans3(trans2(trans1(image)))
 	return image
+
 
 def default_flist_reader(flist):
 	"""
@@ -44,13 +47,33 @@ def default_flist_reader(flist):
 				stripped_line = line.strip()
 				# impath, imlabel = stripped_line.split()
 				impath, imlabel = re.search("(.*?)\s+(\d)", stripped_line).groups()
-				imlist.append( (impath, int(imlabel)) )
+				imlist.append((impath, int(imlabel)))
 			except Exception as e:
 				pass
 			if os.path.isdir(impath):
 				pass
 
 	return imlist
+
+
+def unlabeled_flist_reader(flist):
+	"""
+	flist format: impath\nimpath\n ...
+	"""
+	imlist = []
+	with open(flist, 'r') as rf:
+		for line in rf.readlines():
+			try:
+				stripped_line = line.strip()
+				impath = re.search("(.*?)\n", stripped_line).group(0)
+				imlist.append(impath)
+			except Exception as e:
+				pass
+			if os.path.isdir(impath):
+				pass
+
+	return imlist
+
 
 class ImageFilelist(data.Dataset):
 
@@ -64,7 +87,7 @@ class ImageFilelist(data.Dataset):
 
 	def __getitem__(self, index):
 		impath, target = self.imlist[index]
-		img = self.loader(os.path.join(self.root,impath))
+		img = self.loader(os.path.join(self.root, impath))
 		if self.transform is not None:
 			img = self.transform(img)
 		if self.target_transform is not None:
