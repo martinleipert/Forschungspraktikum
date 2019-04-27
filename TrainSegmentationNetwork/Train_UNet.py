@@ -73,9 +73,11 @@ def main():
     optimizer = optimizer_ft
 
     for epoch in range(num_epochs):
+
+        # Start the training phase of an epoch
         epoch_start = time.time()
 
-        print(f'Epoch {epoch}/{num_epochs - 1}')
+        print(f'\n{epoch_start - start_time} s elapsed\nEpoch {epoch + 1 }/{num_epochs}')
         print('-' * 10)
 
         # Trainingphase

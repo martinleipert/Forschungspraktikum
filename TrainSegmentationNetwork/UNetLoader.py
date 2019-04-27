@@ -11,6 +11,11 @@ Stolen from
 https://github.com/usuyama/pytorch-unet
 """
 
+"""
+Loader for the RGB Images from the Directory
+
+"""
+
 
 def default_loader(path):
 
@@ -32,6 +37,11 @@ def default_loader(path):
     image.close()
 
     return transformed
+
+"""
+Load the mask images
+which contain the information where an object is located in binary format
+"""
 
 
 def mask_loader(path):
@@ -60,6 +70,11 @@ def mask_loader(path):
     transformed.float()
 
     return transformed
+
+
+"""
+A Dataset containing data from a list which is built of tuples:
+"""
 
 
 class UNetDataset(Dataset):

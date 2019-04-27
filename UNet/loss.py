@@ -26,3 +26,4 @@ def dice_loss(pred, target, smooth = 1.):
     return loss.mean()
 
 # TODO Implement modified dice loss which weights the border less then the center
+# Or smooth the mask with a Gaussian?

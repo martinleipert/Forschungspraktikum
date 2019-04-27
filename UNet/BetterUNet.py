@@ -15,11 +15,11 @@ Martin Leipert
 26.04.2019
 """
 
-
+# Method to generate a convolutional layer
+# Contracting path
 def conv3x3(in_channels, out_channels, stride=1,
-            padding=1, bias=True, groups=1):
-	return nn.Conv2d(
-		in_channels,
+	        padding=1, bias=True, groups=1):
+	return nn.Conv2d(in_channels,
 		out_channels,
 		kernel_size=3,
 		stride=stride,
@@ -27,7 +27,7 @@ def conv3x3(in_channels, out_channels, stride=1,
 		bias=bias,
 		groups=groups)
 
-
+# Method for the expanding path
 def upconv2x2(in_channels, out_channels, mode='transpose'):
 	if mode == 'transpose':
 		return nn.ConvTranspose2d(
@@ -42,7 +42,7 @@ def upconv2x2(in_channels, out_channels, mode='transpose'):
 			nn.Upsample(mode='bilinear', scale_factor=2),
 			conv1x1(in_channels, out_channels))
 
-
+# 1 by 1 convolution for the contracting path
 def conv1x1(in_channels, out_channels, groups=1):
 	return nn.Conv2d(
 		in_channels,
@@ -51,7 +51,8 @@ def conv1x1(in_channels, out_channels, groups=1):
 		groups=groups,
 		stride=1)
 
-
+# Helper Module for the downward path
+# -> Construct tileable parts of a downward path
 class DownConv(nn.Module):
 	"""
 	A helper Module that performs 2 convolutions and 1 MaxPool.
@@ -80,12 +81,12 @@ class DownConv(nn.Module):
 		return x, before_pool
 
 
+# Helper module for the upward path
 class UpConv(nn.Module):
 	"""
 	A helper Module that performs 2 convolutions and 1 UpConvolution.
 	A ReLU activation follows each convolution.
 	"""
-
 	def __init__(self, in_channels, out_channels,
 	             merge_mode='concat', up_mode='transpose'):
 		super(UpConv, self).__init__()
@@ -123,24 +124,24 @@ class UpConv(nn.Module):
 
 
 class UNet(nn.Module):
-	""" `UNet` class is based on https://arxiv.org/abs/1505.04597
-	The U-Net is a convolutional encoder-decoder neural network.
-	Contextual spatial information (from the decoding,
-	expansive pathway) about an input tensor is merged with
-	information representing the localization of details
-	(from the encoding, compressive pathway).
-	Modifications to the original paper:
-	(1) padding is used in 3x3 convolutions to prevent loss
-		of border pixels
-	(2) merging outputs does not require cropping due to (1)
-	(3) residual connections can be used by specifying
-		UNet(merge_mode='add')
-	(4) if non-parametric upsampling is used in the decoder
-		pathway (specified by upmode='upsample'), then an
-		additional 1x1 2d convolution occurs after upsampling
-		to reduce channel dimensionality by a factor of 2.
-		This channel halving happens with the convolution in
-		the tranpose convolution (specified by upmode='transpose')
+""" `UNet` class is based on https://arxiv.org/abs/1505.04597
+The U-Net is a convolutional encoder-decoder neural network.
+Contextual spatial information (from the decoding,
+expansive pathway) about an input tensor is merged with
+information representing the localization of details
+(from the encoding, compressive pathway).
+Modifications to the original paper:
+(1) padding is used in 3x3 convolutions to prevent loss
+	of border pixels
+(2) merging outputs does not require cropping due to (1)
+(3) residual connections can be used by specifying
+	UNet(merge_mode='add')
+(4) if non-parametric upsampling is used in the decoder
+	pathway (specified by upmode='upsample'), then an
+	additional 1x1 2d convolution occurs after upsampling
+	to reduce channel dimensionality by a factor of 2.
+	This channel halving happens with the convolution in
+	the tranpose convolution (specified by upmode='transpose')
 	"""
 
 	def __init__(self, num_classes, in_channels=3, depth=5,
@@ -204,8 +205,7 @@ class UNet(nn.Module):
 		for i in range(depth - 1):
 			ins = outs
 			outs = ins // 2
-			up_conv = UpConv(ins, outs, up_mode=up_mode,
-			                 merge_mode=merge_mode)
+			up_conv = UpConv(ins, outs, up_mode=up_mode, merge_mode=merge_mode)
 			self.up_convs.append(up_conv)
 
 		self.conv_final = conv1x1(outs, self.num_classes)
@@ -216,6 +216,10 @@ class UNet(nn.Module):
 
 		self.reset_params()
 
+	# Weight initialization with
+	# Xavier normal
+	# Variance of x and y is preserved
+	# See the paper http://proceedings.mlr.press/v9/glorot10a/glorot10a.pdf
 	@staticmethod
 	def weight_init(m):
 		if isinstance(m, nn.Conv2d):
@@ -226,6 +230,7 @@ class UNet(nn.Module):
 		for i, m in enumerate(self.modules()):
 			self.weight_init(m)
 
+	# Composed Forward path
 	def forward(self, x):
 		encoder_outs = []
 

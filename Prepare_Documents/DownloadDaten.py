@@ -9,6 +9,8 @@ import os
 # Download files annotated in an xml file from the internet
 # Originally to download ~31000 medieval documents
 
+# The annotated notary documents where directly downloaded from Transkribus
+
 # Hardcoded arguments for downloading
 # Where are the file urls denoted
 XML_FILE = "/home/martin/Forschungspraktikum/Testdaten/KeineNotarsurkunden/KeineNotarsurkunden.xml"
@@ -87,6 +89,7 @@ def get_the_urls_from_xml(xml_file):
 		pass
 
 	return urls
+
 
 if __name__ == '__main__':
 	main()
