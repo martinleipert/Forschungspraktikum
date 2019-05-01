@@ -85,6 +85,7 @@ def unlabeled_flist_reader(flist):
 				pass
 			if os.path.isdir(impath):
 				pass
+	random.shuffle(imlist)
 
 	return imlist
 
