@@ -16,7 +16,7 @@ DIR_ROOT = "/home/martin/Forschungspraktikum/Testdaten/"
 NOTARSURKUNDEN_DIR = f"{DIR_ROOT}/Transkribierte_Notarsurkunden/notarskurkunden_mom_restored/"
 XMLFILE_DIR = f"{DIR_ROOT}/Transkribierte_Notarsurkunden/notarskurkunden_mom_restored/page"
 OUT_DIR = f"{DIR_ROOT}/Transkribierte_Notarsurkunden/notarskurkunden_mom_restored/advanced_segmented"
-SCHEMA = http://schema.primaresearch.org/PAGE/gts/pagecontent/2013-07-15
+SCHEMA = "http://schema.primaresearch.org/PAGE/gts/pagecontent/2013-07-15"
 Image.MAX_IMAGE_PIXELS = 933120000
 
 
@@ -71,8 +71,6 @@ def mark_region(img_array, point_string):
 	pass
 
 	return img_array
-
-
 
 
 if __name__ == '__main__':
