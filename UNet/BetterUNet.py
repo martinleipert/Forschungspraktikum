@@ -124,19 +124,20 @@ class UpConv(nn.Module):
 
 
 class UNet(nn.Module):
-""" `UNet` class is based on https://arxiv.org/abs/1505.04597
-The U-Net is a convolutional encoder-decoder neural network.
-Contextual spatial information (from the decoding,
-expansive pathway) about an input tensor is merged with
-information representing the localization of details
-(from the encoding, compressive pathway).
-Modifications to the original paper:
-(1) padding is used in 3x3 convolutions to prevent loss
-	of border pixels
-(2) merging outputs does not require cropping due to (1)
-(3) residual connections can be used by specifying
-	UNet(merge_mode='add')
-(4) if non-parametric upsampling is used in the decoder
+	"""
+	`UNet` class is based on https://arxiv.org/abs/1505.04597
+	The U-Net is a convolutional encoder-decoder neural network.
+	Contextual spatial information (from the decoding,
+	expansive pathway) about an input tensor is merged with
+	information representing the localization of details
+	(from the encoding, compressive pathway).
+	Modifications to the original paper:
+	(1) padding is used in 3x3 convolutions to prevent loss
+		of border pixels
+	(2) merging outputs does not require cropping due to (1)
+	(3) residual connections can be used by specifying
+		UNet(merge_mode='add')
+	(4) if non-parametric upsampling is used in the decoder
 	pathway (specified by upmode='upsample'), then an
 	additional 1x1 2d convolution occurs after upsampling
 	to reduce channel dimensionality by a factor of 2.
@@ -223,8 +224,8 @@ Modifications to the original paper:
 	@staticmethod
 	def weight_init(m):
 		if isinstance(m, nn.Conv2d):
-			init.xavier_normal(m.weight)
-			init.constant(m.bias, 0)
+			init.xavier_normal_(m.weight)
+			init.constant_(m.bias, 0)
 
 	def reset_params(self):
 		for i, m in enumerate(self.modules()):

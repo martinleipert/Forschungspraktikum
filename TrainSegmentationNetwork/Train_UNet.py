@@ -6,7 +6,7 @@ import copy
 import torch
 # from UNet.pytorch_unet import UNet
 from UNet.BetterUNet import UNet
-from UNetLoader import UNetDataset
+from UNetLoader_dynamic import UNetDatasetDynamicMask
 from torchvision import transforms
 
 from matplotlib import pyplot
@@ -35,7 +35,7 @@ def main():
     """
 
     # Load with self written FIle loader
-    training_data = UNetDataset(FILE_LIST_TRAINING)     #, transform=trans)
+    training_data = UNetDatasetDynamicMask(FILE_LIST_TRAINING, region_select=True)     #, transform=trans)
     # validation_data = ImageFilelist('.', VALIDATION_SET)
     # test_data = ImageFilelist('.', TEST_SET)
 
@@ -47,7 +47,7 @@ def main():
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(device)
 
-    num_class = 2
+    num_class = 4
     model = UNet(num_class, depth=5)
     model.to(device)
 
@@ -84,6 +84,8 @@ def main():
         model.train()
         epoch_samples = 0
         metrics = defaultdict(float)
+
+
         for images, masks in trainloader:
             images = images.to(device)
             masks = masks.to(device)
@@ -102,6 +104,7 @@ def main():
 
             # statistics
             epoch_samples += images.size(0)
+
 
         print_metrics(metrics, epoch_samples, 'train')
         epoch_loss = metrics['loss'] / epoch_samples
@@ -135,7 +138,7 @@ def calc_loss(pred, target, metrics, bce_weight=0.5):
 
     bce = F.binary_cross_entropy_with_logits(pred, target)
 
-    pred = F.sigmoid(pred)
+    pred = torch.sigmoid(pred)
     dice = dice_loss(pred, target)
 
     loss = bce * bce_weight + dice * (1 - bce_weight)
