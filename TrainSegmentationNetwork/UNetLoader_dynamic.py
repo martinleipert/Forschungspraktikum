@@ -170,7 +170,9 @@ def dynamic_mask_loader(path, augmentation=None, region_select=False, p_region_s
             # TODO CROP such that the regions are inside
 
             horst = 1
+            mask_array = cropped_mask
             pass
+
 
     # todo PROCEEED HERE
 
@@ -197,7 +199,7 @@ def dynamic_mask_loader(path, augmentation=None, region_select=False, p_region_s
 
     mask_list = [np.asarray(im) for im in mask_list]
 
-    trafo_mask = np.zeros(list(mask_list[0].shape) + [mask_array.shape[2]])
+    trafo_mask = np.zeros(list(trafo_img.size()[1:3]) + [mask_array.shape[2]])
 
     for i in range(trafo_mask.shape[2]):
         trafo_mask[:, :, i] = mask_list[i]
@@ -248,11 +250,14 @@ class UNetDatasetDynamicMask(Dataset):
             image = self.transform(image)
             mask = self.transform(mask)
 
+
+
         if self.augment is True:
             image, mask = self.augmentation(image, mask)
 
             image = tensor(np.float32(image))
             mask = tensor(mask)
+
 
         return [image, mask]
 

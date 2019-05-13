@@ -21,8 +21,8 @@ https://github.com/usuyama/pytorch-unet
 """
 
 
-FILE_LIST_TRAINING = "/home/martin/Forschungspraktikum/Testdaten/Segmentation_Sets/mini_set/training.txt"
-FILE_LIST_VALIDATION = "/home/martin/Forschungspraktikum/Testdaten/Segmentation_Sets/mini_set/validation.txt"
+FILE_LIST_TRAINING = "/home/martin/Forschungspraktikum/Testdaten/Segmentation_Sets/full_set/training.txt"
+FILE_LIST_VALIDATION = "/home/martin/Forschungspraktikum/Testdaten/Segmentation_Sets/full_set/validation.txt"
 
 # "/home/martin/Forschungspraktikum/Testdaten//Transkribierte_Notarsurkunden/siegel_files.txt"
 BATCH_SIZE = 5
@@ -38,7 +38,7 @@ def main():
     """
 
     # Load with self written FIle loader
-    training_data = UNetDatasetDynamicMask(FILE_LIST_TRAINING, region_select=True)     #, transform=trans)
+    training_data = UNetDatasetDynamicMask(FILE_LIST_TRAINING, region_select=False)     #, transform=trans)
     validation_data = UNetDatasetDynamicMask(FILE_LIST_VALIDATION, region_select=False)
     # test_data = ImageFilelist('.', TEST_SET)
 
@@ -69,7 +69,8 @@ def main():
     """
     Here  it  could be separated into a method
     """
-    num_epochs = 50
+    num_epochs = 30
+    reduce_every = 10
 
     start_time = time.time()
 
@@ -104,7 +105,7 @@ def main():
                 outputs = model(images)
 
                 # TODO BCE seems to be broken ?
-                loss = calc_loss(outputs, masks, metrics, 0)
+                loss = calc_loss(outputs, masks, metrics, 1)
 
                 # backward + optimize only if in training phase
                 loss.backward()
@@ -134,7 +135,7 @@ def main():
                 outputs = model(images)
 
                 # TODO BCE seems to be broken ?
-                loss = calc_loss(outputs, masks, metrics, 0)
+                loss = calc_loss(outputs, masks, metrics, 1)
 
                 # statistics
                 epoch_samples += images.size(0)

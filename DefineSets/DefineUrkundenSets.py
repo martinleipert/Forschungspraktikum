@@ -19,18 +19,18 @@ REGION_TYPES = {
 }
 
 # How many data of the set to use for  testing
-PERCENTAGE_TEST = 0.25
+PERCENTAGE_TEST = 0.1
 # Percentage of the data in training actually used for validation
-PERCENTAGE_VALIDATION = 1. / 3.
+PERCENTAGE_VALIDATION = 1. / 9.
 
 NOTARSURKUNDEN_SETS = "/home/martin/Forschungspraktikum/Testdaten/Segmentation_Sets/"
 NOTARSURKUNDEN_DIR = "/home/martin/Forschungspraktikum/Testdaten/Transkribierte_Notarsurkunden/" \
                      "notarskurkunden_mom_restored/"
 
-REDUCE_SET = True
-REDUCTION = 0.2
+REDUCE_SET = False
+REDUCTION = 0.5
 
-SET_NAME = "mini_set"
+SET_NAME = "full_set"
 
 
 def main():
