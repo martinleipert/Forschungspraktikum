@@ -250,14 +250,15 @@ class UNetDatasetDynamicMask(Dataset):
             image = self.transform(image)
             mask = self.transform(mask)
 
-
-
         if self.augment is True:
             image, mask = self.augmentation(image, mask)
 
             image = tensor(np.float32(image))
             mask = tensor(mask)
 
+        trafo = transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+
+        image = trafo(image)
 
         return [image, mask]
 

@@ -69,12 +69,15 @@ class DownConv(nn.Module):
 		self.conv1 = conv3x3(self.in_channels, self.out_channels)
 		self.conv2 = conv3x3(self.out_channels, self.out_channels)
 
+		self.batch_norm1 = torch.nn.BatchNorm2d(self.out_channels)
+		self.batch_norm2 = torch.nn.BatchNorm2d(self.out_channels)
+
 		if self.pooling:
 			self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
 
 	def forward(self, x):
-		x = F.relu(self.conv1(x))
-		x = F.relu(self.conv2(x))
+		x = self.batch_norm1(F.relu(self.conv1(x)))
+		x = self.batch_norm2(F.relu(self.conv2(x)))
 		before_pool = x
 		if self.pooling:
 			x = self.pool(x)
@@ -95,6 +98,9 @@ class UpConv(nn.Module):
 		self.out_channels = out_channels
 		self.merge_mode = merge_mode
 		self.up_mode = up_mode
+
+		self.batch_norm1 = torch.nn.BatchNorm2d(self.out_channels)
+		self.batch_norm2 = torch.nn.BatchNorm2d(self.out_channels)
 
 		self.upconv = upconv2x2(self.in_channels, self.out_channels,
 		                        mode=self.up_mode)
@@ -118,10 +124,12 @@ class UpConv(nn.Module):
 			x = torch.cat((from_up, from_down), 1)
 		else:
 			x = from_up + from_down
-		x = F.relu(self.conv1(x))
-		x = F.relu(self.conv2(x))
+		x = self.batch_norm1(F.relu(self.conv1(x)))
+		x = self.batch_norm2(F.relu(self.conv2(x)))
 		return x
 
+
+# TODO introduce Batch normalization to make network trainable
 
 class UNet(nn.Module):
 	"""

@@ -6,8 +6,9 @@ import copy
 import torch
 # from UNet.pytorch_unet import UNet
 from UNet.BetterUNet import UNet
+# from UNet.ThirdUNet import UNet
 from UNetLoader_dynamic import UNetDatasetDynamicMask
-from torchvision import transforms
+from torch.optim import lr_scheduler
 
 from matplotlib import pyplot
 import numpy as np
@@ -21,8 +22,8 @@ https://github.com/usuyama/pytorch-unet
 """
 
 
-FILE_LIST_TRAINING = "/home/martin/Forschungspraktikum/Testdaten/Segmentation_Sets/full_set/training.txt"
-FILE_LIST_VALIDATION = "/home/martin/Forschungspraktikum/Testdaten/Segmentation_Sets/full_set/validation.txt"
+FILE_LIST_TRAINING = "/home/martin/Forschungspraktikum/Testdaten/Segmentation_Sets/mini_set/training.txt"
+FILE_LIST_VALIDATION = "/home/martin/Forschungspraktikum/Testdaten/Segmentation_Sets/mini_set/validation.txt"
 
 # "/home/martin/Forschungspraktikum/Testdaten//Transkribierte_Notarsurkunden/siegel_files.txt"
 BATCH_SIZE = 5
@@ -38,7 +39,7 @@ def main():
     """
 
     # Load with self written FIle loader
-    training_data = UNetDatasetDynamicMask(FILE_LIST_TRAINING, region_select=False)     #, transform=trans)
+    training_data = UNetDatasetDynamicMask(FILE_LIST_TRAINING, region_select=True)     #, transform=trans)
     validation_data = UNetDatasetDynamicMask(FILE_LIST_VALIDATION, region_select=False)
     # test_data = ImageFilelist('.', TEST_SET)
 
@@ -51,7 +52,7 @@ def main():
     print(device)
 
     num_class = 4
-    model = UNet(num_class, depth=5) # torch.load("unet_mini_training.pth")    #
+    model = UNet(num_class) #, depth=5)    # torch.load("unet_mini_training.pth")    #
     model.to(device)
 
     # freeze backbone layers
@@ -61,7 +62,7 @@ def main():
 
     optimizer_ft = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-3)
 
-    exp_lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer_ft, step_size=30, gamma=0.1)
+    exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=30, gamma=0.1)
 
     # model = train_model(model, optimizer_ft, exp_lr_scheduler, num_epochs=60)
 
@@ -84,6 +85,8 @@ def main():
         print(f'\n{epoch_start - start_time} s elapsed\nEpoch {epoch + 1 }/{num_epochs}')
         print('-' * 10)
 
+        exp_lr_scheduler.step()
+
         # Trainingphase
         model.train()
         epoch_samples = 0
@@ -98,14 +101,24 @@ def main():
                 images = images.to(device)
                 masks = masks.to(device)
 
+                # Set Gradients to zero
                 optimizer.zero_grad()
 
                 # forward
                 # track history if only in train
-                outputs = model(images)
+                outputs = model.forward(images)
+
+                """
+                sum_set = np.sum(torch.sigmoid(outputs).cpu().detach().numpy(), axis=1)
+                numpy_set = torch.sigmoid(outputs).cpu().detach().numpy()
+                for i in range(sum_set.shape[0]):
+                    numpy_set[i, :, :, :] = np.divide(numpy_set[i, :, :, :], sum_set[i, :, :])
+                pyplot.imshow(numpy_set[0, 0, :, :], vmin=0, vmax=1)
+                """
 
                 # TODO BCE seems to be broken ?
-                loss = calc_loss(outputs, masks, metrics, 1)
+                # F.binary_cross_entropy_with_logits(outputs.float(), masks.float())
+                loss = calc_loss(outputs, masks, metrics)
 
                 # backward + optimize only if in training phase
                 loss.backward()
@@ -135,7 +148,7 @@ def main():
                 outputs = model(images)
 
                 # TODO BCE seems to be broken ?
-                loss = calc_loss(outputs, masks, metrics, 1)
+                loss = calc_loss(outputs, masks, metrics)
 
                 # statistics
                 epoch_samples += images.size(0)
@@ -195,6 +208,22 @@ def print_metrics(metrics, epoch_samples, phase):
         outputs.append("{}: {:4f}".format(k, metrics[k] / epoch_samples))
 
     print("{}: {}".format(phase, ", ".join(outputs)))
+
+
+def plot_helper(dataset, selector):
+    sum_set = np.sum(torch.sigmoid(dataset).cpu().detach().numpy(), axis=1)
+
+    numpy_set = torch.sigmoid(dataset).cpu().detach().numpy()
+
+    for i in range(sum_set.shape[0]):
+        numpy_set[i, :, :, :] = np.divide(numpy_set[i, :, :, :], sum_set[i, :, :])
+        pass
+
+    pyplot.imshow(numpy_set[0, selector, :, :], vmin=0, vmax=1)
+
+
+def mask_helper(image, mask):
+    pyplot.imshow(np.where(mask[0, 3, :, :].cpu() == 1, image[0, 0, :, :].cpu(), 0))
 
 
 if __name__ == '__main__':
