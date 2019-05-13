@@ -11,18 +11,19 @@ import numpy
 from matplotlib import pyplot
 
 # region Parameters
-CHOSEN_SET = "mini_set"
+CHOSEN_SET = "full_set"
 
 TRAINING_SET = f"/home/martin/Forschungspraktikum/Testdaten/Sets/{CHOSEN_SET}/traindata.txt"
 VALIDATION_SET = f"/home/martin/Forschungspraktikum/Testdaten/Sets/{CHOSEN_SET}/validationdata.txt"
 TEST_SET = f"/home/martin/Forschungspraktikum/Testdaten/Sets/{CHOSEN_SET}/testdata.txt"
 
-BATCH_SIZE = 192
+LEARNING_RATE = 0.003
+BATCH_SIZE = 256
 NUM_CLASSES = 2
 
 # Parametrization for the training
-EPOCHS = 15
-PRINT_EVERY = 10
+EPOCHS = 30
+PRINT_EVERY = 25
 # endregion
 
 
@@ -57,12 +58,12 @@ def main():
 	weights = (weights / numpy.sum(weights))*len(hist)
 	#endregion
 
-	# region Model PReparation
+	# region Model Preparation
 	# Train on CUDA if possible
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 	# Pick the model
-	densenet121 = models.densenet121(pretrained=True)
+	densenet121 = torch.load('densenet121_notarsurkunden.pth')  # models.densenet121(pretrained=True)
 
 	for param in densenet121.parameters():
 		param.requires_grad = False
@@ -74,7 +75,8 @@ def main():
 	training_criterion = nn.CrossEntropyLoss(weight=torch.from_numpy(numpy.float32(weights)).to(device))
 	validation_criterion = nn.CrossEntropyLoss().to(device)
 	# Optimzer
-	optimizer = optim.Adam(densenet121.parameters(), lr=0.003)
+	lr = LEARNING_RATE
+	optimizer = optim.Adam(densenet121.parameters(), lr=lr)
 	# To GPU (or CPU if trained on CPU)
 	densenet121.to(device)
 	# endregion
@@ -104,6 +106,11 @@ def main():
 	t1 = time.time()
 
 	for epoch in range(EPOCHS):
+
+		if epoch == 15:
+			lr = LEARNING_RATE * 1e-1
+			optimizer = optim.Adam(densenet121.parameters(), lr=lr)
+
 		for inputs, labels in trainloader:
 			steps += 1
 			inputs, labels = inputs.to(device), labels.to(device)
@@ -168,9 +175,10 @@ def main():
 
 				running_loss = 0
 				densenet121.train()
-	# endregion
+		# endregion
 
-	torch.save(densenet121, 'densenet121_notarsurkunden.pth')
+		# Save the net after each epoch
+		torch.save(densenet121, 'densenet121_notarsurkunden.pth')
 
 
 if __name__ == '__main__':

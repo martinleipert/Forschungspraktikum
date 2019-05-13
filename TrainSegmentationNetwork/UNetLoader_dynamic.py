@@ -6,6 +6,18 @@ import os
 from xml.etree import ElementTree as ET
 # For random region selection
 import random
+import cv2
+from torch import tensor
+
+from albumentations import (
+    HorizontalFlip, IAAPerspective, ShiftScaleRotate, CLAHE, RandomRotate90,
+    Transpose, ShiftScaleRotate, Blur, OpticalDistortion, GridDistortion, HueSaturationValue,
+    IAAAdditiveGaussianNoise, GaussNoise, MotionBlur, MedianBlur, IAAPiecewiseAffine,
+    IAASharpen, IAAEmboss, RandomBrightnessContrast, Flip, OneOf, Compose
+)
+
+
+from matplotlib import pyplot as plt
 
 """
 Martin Leipert
@@ -32,7 +44,6 @@ REGION_TYPES = {
     "GraphicRegion": 3
 }
 
-
 # Helper Method for bounding box extraction
 def extract_bounding_box(pt_arr):
 
@@ -44,6 +55,33 @@ def extract_bounding_box(pt_arr):
     bb_parameters = (x_min, y_min, x_max - x_min, y_max - y_min)
     return bb_parameters
 
+
+def strong_aug(p=0.9):
+    return Compose([
+        ShiftScaleRotate(shift_limit=0.15, scale_limit=0.1, rotate_limit=5, p=0.3),
+        OpticalDistortion(p=0.3),
+        GridDistortion(p=0.4),
+        IAAPiecewiseAffine(p=0.3),
+        RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.),
+        HueSaturationValue(p=0.3),
+    ], p=p)
+
+
+def simple_augmentation(img, mask):
+    trafo1 = strong_aug(p=0.9)
+
+    img = np.array(img.cpu())
+    mask = np.array(mask.cpu(), dtype=np.uint8)
+    try:
+        transformed = trafo1(image=img, mask=mask)
+        img = transformed['image']
+        mask = transformed['mask']
+        return img, mask
+    # TODO more elegant -> I don't know why I need to do this fix
+    except Exception as e:
+        pass
+    # TODO : Why img is binary?
+    return img, mask
 
 
 """
@@ -59,19 +97,24 @@ def dynamic_mask_loader(path, augmentation=None, region_select=False, p_region_s
     xml_filename = f"{filename}.xml"
     xml_path = os.path.join(dir_name, 'page', xml_filename)
 
-    xml_tree = ET.parse(xml_path)
+    try:
+        xml_tree = ET.parse(xml_path)
+    except Exception as e:
+        pass
     root = xml_tree.getroot()
     ns = '{' + SCHEMA + '}'
 
+    # Load mask
     image = Image.open(path)
-
     image.load()
     image = image.convert('RGB')
 
-    img_array = np.int8(np.zeros(list(image.size) + [len(REGION_TYPES)]))
+    # Contruct mask array
+    mask_array = np.int8(np.zeros(list([image.size[1], image.size[0]]) + [len(REGION_TYPES)]))
 
     all_els = []
 
+    # Generate masks for the regions
     for key, value in REGION_TYPES.items():
         els = root.findall("*/" + ns + key)
 
@@ -79,52 +122,60 @@ def dynamic_mask_loader(path, augmentation=None, region_select=False, p_region_s
             points = el.find(ns + 'Coords').get('points')
             fix_pts = tuple(map(lambda x: tuple(map(int, x.split(','))), points.split(' ')))
 
-            img = Image.new('L', [image.size[1], image.size[0]], 0)
+            img = Image.new('L', [image.size[0], image.size[1]], 0)
             ImageDraw.Draw(img).polygon(fix_pts, fill=1, outline=1, )
             mask = np.array(img)
 
-            img_array[:, :, value] = np.logical_or(mask, img_array[:, :, value])
+            mask_array[:, :, value] = np.logical_or(mask, mask_array[:, :, value])
 
         # Add to all pixels where there is a value so we can mask out afterwards
-        img_array[:, :, 0] = img_array[:, :, 0] + img_array[:, :, value]
+        mask_array[:, :, 0] = mask_array[:, :, 0] + mask_array[:, :, value]
         all_els.extend(els)
-    # Mask out the background
-    img_array[:, :, 0] = np.where(img_array[:, :, 0] == 0, 1, 0)
 
+    # Mask out the background
+    mask_array[:, :, 0] = np.where(mask_array[:, :, 0] == 0, 1, 0)
+
+    # If a random region get's masked out
+    if region_select:
+        randint = random.randint(1, 100)
+
+        if randint < 75:
+            elidx = random.randint(0, len(all_els)-1)
+            element = all_els[elidx]
+            points = element.find(ns + 'Coords').get('points')
+            fix_pts = tuple(map(lambda x: tuple(map(int, x.split(','))), points.split(' ')))
+
+            # Get the regions bounding box
+            xbb, ybb, wbb, hbb = extract_bounding_box(fix_pts)
+
+            factor = 0.25
+
+            sub_h = hbb*factor
+            sub_w = wbb*factor
+
+            xbb = xbb-sub_w
+            ybb = ybb-sub_h
+            wbb = wbb + 2*sub_w
+            hbb = hbb + 2*sub_h
+
+            image = image.crop((xbb, ybb, xbb+wbb, ybb+hbb))
+
+            # Apply the crop to the mask parts
+            cropped_mask = np.zeros((image.size[1], image.size[0], mask_array.shape[2]))
+            for i in range(mask_array.shape[2]):
+                tmp_im = Image.fromarray(mask_array[:, :, i])
+                tmp_im = tmp_im.crop((xbb, ybb, xbb + wbb, ybb + hbb))
+
+                cropped_mask[:, :, i] = np.array(tmp_im)
+            # TODO CROP such that the regions are inside
+
+            horst = 1
+            pass
+
+    # todo PROCEEED HERE
 
     # Augmentation-independent Transformation -> TO Tensor
     trans3 = transforms.ToTensor()
-
-    if region_select:
-        element = all_els[random.randint(0, len(all_els)-1)]
-        points = element.find(ns + 'Coords').get('points')
-        fix_pts = tuple(map(lambda x: tuple(map(int, x.split(','))), points.split(' ')))
-
-        xbb, ybb, wbb, hbb = extract_bounding_box(fix_pts)
-
-        factor = 0.15
-
-        sub_h = hbb*factor
-        sub_w = wbb*factor
-
-        xbb = xbb-sub_w
-        ybb = ybb-sub_h
-        wbb = wbb + 2*sub_w
-        hbb = hbb + 2*sub_h
-
-        image = image.crop((xbb, ybb, xbb+wbb, ybb+hbb))
-
-        mask_array = np.zeros((image.size[1], image.size[0], img_array.shape[2]))
-        for i in range(img_array.shape[2]):
-            tmp_im = Image.fromarray(img_array[:, :, i])
-            tmp_im = tmp_im.crop((xbb, ybb, xbb + wbb, ybb + hbb))
-
-            mask_array[:, :, i] = np.array(tmp_im)
-        # TODO CROP such that the regions are inside
-
-        pass
-
-    # todo PROCEEED HERE
 
     if augmentation is None:
         trans1 = transforms.Resize(256)
@@ -137,16 +188,16 @@ def dynamic_mask_loader(path, augmentation=None, region_select=False, p_region_s
         pass
 
     mask_list = list()
-    for i in range(img_array.shape[2]):
-        tmp_im_array = Image.fromarray(img_array[:, :, i])
+    for i in range(mask_array.shape[2]):
+        tmp_im_array = Image.fromarray(mask_array[:, :, i])
         if augmentation is None:
             mask_list.append(trans2(trans1(tmp_im_array)))
         else:
-            mask_list.append(tmp_im_array)
-            pass
+            mask_list.append(augmentation(tmp_im_array))
+
     mask_list = [np.asarray(im) for im in mask_list]
 
-    trafo_mask = np.zeros(list(mask_list[0].shape) + [img_array.shape[2]])
+    trafo_mask = np.zeros(list(mask_list[0].shape) + [mask_array.shape[2]])
 
     for i in range(trafo_mask.shape[2]):
         trafo_mask[:, :, i] = mask_list[i]
@@ -164,12 +215,12 @@ A Dataset containing data from a list which is built of tuples:
 
 
 class UNetDatasetDynamicMask(Dataset):
-    def __init__(self, file_path, transform=None, data_set_loader=dynamic_mask_loader, augment=False,
-                 region_select=False):
+    def __init__(self, file_path, transform=None, data_set_loader=dynamic_mask_loader, augment=True,
+                 region_select=False, augmentation=simple_augmentation):
         self.input_images = []
-        self.target_masks = []
         self.data_set_loader = data_set_loader
         self.augment = augment
+        self.augmentation = augmentation
         self.region_select = region_select
 
         with open(file_path) as open_file:
@@ -177,14 +228,11 @@ class UNetDatasetDynamicMask(Dataset):
             splitted_lines = lines.split('\n')
 
             for line in splitted_lines:
-                if line is '':
+                if line == "":
                     continue
-                img, mask = line.split(',')
-                img = img.strip()
-                mask = mask.strip()
+                img = line.strip()
 
                 self.input_images.append(img)
-                self.target_masks.append(mask)
 
         self.transform = transform
 
@@ -196,11 +244,15 @@ class UNetDatasetDynamicMask(Dataset):
 
         image, mask = self.data_set_loader(image, region_select=self.region_select)
 
-        """
         if self.transform:
             image = self.transform(image)
             mask = self.transform(mask)
-        """
+
+        if self.augment is True:
+            image, mask = self.augmentation(image, mask)
+
+            image = tensor(np.float32(image))
+            mask = tensor(mask)
 
         return [image, mask]
 

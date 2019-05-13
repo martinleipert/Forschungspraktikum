@@ -16,7 +16,7 @@ KEINEURKUNDEN_DIR = "/home/martin/Forschungspraktikum/Testdaten/KeineNotarsurkun
 
 # Where the defined sets are stored
 STORE_DIR = "/home/martin/Forschungspraktikum/Testdaten/Sets/"
-STORE_FILE = "mini_set"
+STORE_FILE = "full_set"
 
 # Tags for the Json Files
 TAG_TRAINING_SET = "TRAINING_SET"
@@ -27,7 +27,7 @@ TAG_KEINE_URKUNDEN = "KEINE_URKUNDEN"
 
 MODE = 1
 
-REDUCE_SET = True
+REDUCE_SET = False
 REDUCTION = 0.1
 BALANCE_SET = False
 
@@ -154,7 +154,7 @@ def store_list(outputfile, data_label_list):
 def listfiles_fullpath(directory):
 	files = os.listdir(directory)
 	files = [os.path.join(directory, file) for file in files]
-	files = list(filter(lambda x: os.path.isfile(x), files))
+	files = list(filter(lambda x: os.path.isfile(x) and x.lower().endswith('jpg'), files))
 	return files
 
 

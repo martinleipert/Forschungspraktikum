@@ -20,7 +20,7 @@ KEINEURKUNDEN_DIR = "/home/martin/Forschungspraktikum/Testdaten/KeineNotarsurkun
 
 # Where the defined sets are stored
 STORE_DIR = "/home/martin/Forschungspraktikum/Testdaten/Sets/"
-STORE_FILE = "first_set"
+STORE_FILE = "full_set"
 
 # Tags for the Json Files
 TAG_TRAINING_SET = "TRAINING_SET"
