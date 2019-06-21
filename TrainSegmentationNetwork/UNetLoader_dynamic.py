@@ -13,7 +13,7 @@ from albumentations import (
     HorizontalFlip, IAAPerspective, ShiftScaleRotate, CLAHE, RandomRotate90,
     Transpose, ShiftScaleRotate, Blur, OpticalDistortion, GridDistortion, HueSaturationValue,
     IAAAdditiveGaussianNoise, GaussNoise, MotionBlur, MedianBlur, IAAPiecewiseAffine,
-    IAASharpen, IAAEmboss, RandomBrightnessContrast, Flip, OneOf, Compose
+    IAASharpen, IAAEmboss, RandomBrightnessContrast, Flip, OneOf, Compose, ElasticTransform
 )
 
 
@@ -58,12 +58,14 @@ def extract_bounding_box(pt_arr):
 
 def strong_aug(p=0.9):
     return Compose([
-        ShiftScaleRotate(shift_limit=0.15, scale_limit=0.1, rotate_limit=5, p=0.3),
-        OpticalDistortion(p=0.3),
-        GridDistortion(p=0.4),
-        IAAPiecewiseAffine(p=0.3),
-        RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.),
-        HueSaturationValue(p=0.3),
+        ShiftScaleRotate(shift_limit=0.15, scale_limit=0.1, rotate_limit=10, p=0.3),
+        OpticalDistortion(p=0.5),
+        GridDistortion(p=0.5),
+        IAAPiecewiseAffine(p=0.6),
+        RandomBrightnessContrast(brightness_limit=0.3, contrast_limit=0.3),
+        HueSaturationValue(p=0.4),
+        Blur(blur_limit=11, p=0.75),
+        ElasticTransform()
     ], p=p)
 
 
@@ -139,6 +141,8 @@ def dynamic_mask_loader(path, augmentation=None, region_select=False, p_region_s
     if region_select:
         randint = random.randint(1, 100)
 
+        # TODO: Use different snippet sizes so validation loss gets reduced
+        # TODO: Better augmentation
         if randint < 75:
             elidx = random.randint(0, len(all_els)-1)
             element = all_els[elidx]
@@ -148,33 +152,32 @@ def dynamic_mask_loader(path, augmentation=None, region_select=False, p_region_s
             # Get the regions bounding box
             xbb, ybb, wbb, hbb = extract_bounding_box(fix_pts)
 
-            factor = 0.25
+            if hbb > 25 and wbb > 25:
 
-            sub_h = hbb*factor
-            sub_w = wbb*factor
+                factor = 0.25
 
-            xbb = xbb-sub_w
-            ybb = ybb-sub_h
-            wbb = wbb + 2*sub_w
-            hbb = hbb + 2*sub_h
+                sub_h = hbb*factor
+                sub_w = wbb*factor
 
-            image = image.crop((xbb, ybb, xbb+wbb, ybb+hbb))
+                xbb = xbb-sub_w
+                ybb = ybb-sub_h
+                wbb = wbb + 2*sub_w
+                hbb = hbb + 2*sub_h
 
-            # Apply the crop to the mask parts
-            cropped_mask = np.zeros((image.size[1], image.size[0], mask_array.shape[2]))
-            for i in range(mask_array.shape[2]):
-                tmp_im = Image.fromarray(mask_array[:, :, i])
-                tmp_im = tmp_im.crop((xbb, ybb, xbb + wbb, ybb + hbb))
+                image = image.crop((xbb, ybb, xbb+wbb, ybb+hbb))
 
-                cropped_mask[:, :, i] = np.array(tmp_im)
-            # TODO CROP such that the regions are inside
+                # Apply the crop to the mask parts
+                cropped_mask = np.zeros((image.size[1], image.size[0], mask_array.shape[2]))
+                for i in range(mask_array.shape[2]):
+                    tmp_im = Image.fromarray(mask_array[:, :, i])
+                    tmp_im = tmp_im.crop((xbb, ybb, xbb + wbb, ybb + hbb))
 
-            horst = 1
-            mask_array = cropped_mask
-            pass
+                    cropped_mask[:, :, i] = np.array(tmp_im)
+                # TODO CROP such that the regions are inside
 
-
-    # todo PROCEEED HERE
+                horst = 1
+                mask_array = cropped_mask
+                pass
 
     # Augmentation-independent Transformation -> TO Tensor
     trans3 = transforms.ToTensor()
@@ -256,6 +259,7 @@ class UNetDatasetDynamicMask(Dataset):
             image = tensor(np.float32(image))
             mask = tensor(mask)
 
+        # Todo: Remove!
         trafo = transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 
         image = trafo(image)

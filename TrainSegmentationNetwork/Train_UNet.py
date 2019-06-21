@@ -9,6 +9,7 @@ from UNet.BetterUNet import UNet
 # from UNet.ThirdUNet import UNet
 from UNetLoader_dynamic import UNetDatasetDynamicMask
 from torch.optim import lr_scheduler
+from UNet.FocalLoss import FocalLoss2d
 
 from matplotlib import pyplot
 import numpy as np
@@ -21,38 +22,41 @@ Stolen from
 https://github.com/usuyama/pytorch-unet
 """
 
+SET_NAME = "mini_set"
 
-FILE_LIST_TRAINING = "/home/martin/Forschungspraktikum/Testdaten/Segmentation_Sets/mini_set/training.txt"
-FILE_LIST_VALIDATION = "/home/martin/Forschungspraktikum/Testdaten/Segmentation_Sets/mini_set/validation.txt"
+FILE_LIST_TRAINING = "/home/martin/Forschungspraktikum/Testdaten/Segmentation_Sets/%s/training.txt" % SET_NAME
+FILE_LIST_VALIDATION = "/home/martin/Forschungspraktikum/Testdaten/Segmentation_Sets/%s/validation.txt" % SET_NAME
 
-# "/home/martin/Forschungspraktikum/Testdaten//Transkribierte_Notarsurkunden/siegel_files.txt"
 BATCH_SIZE = 5
+NUM_EPOCHS = 25
+NUM_CLASS = 4
+
+# FOCAL or BCE_DICE
+UNET_LOSSFKT = "FOCAL"
+LOAD_MODEL = False
+SAVE_MODEL = False
+MODEL_NAME = "unet_full_training.pth"
+
 
 
 def main():
     torch.cuda.empty_cache()
-    """
-    trans = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])  # imagenet
-    ])
-    """
 
     # Load with self written FIle loader
-    training_data = UNetDatasetDynamicMask(FILE_LIST_TRAINING, region_select=True)     #, transform=trans)
+    training_data = UNetDatasetDynamicMask(FILE_LIST_TRAINING, region_select=True, augment=True)
     validation_data = UNetDatasetDynamicMask(FILE_LIST_VALIDATION, region_select=False)
-    # test_data = ImageFilelist('.', TEST_SET)
 
     # Define the DataLoader
     trainloader = torch.utils.data.DataLoader(training_data, batch_size=BATCH_SIZE)
     validationloader = torch.utils.data.DataLoader(validation_data, batch_size=BATCH_SIZE)
-    # testloader = torch.utils.data.DataLoader(test_data, batch_size=BATCH_SIZE)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(device)
 
-    num_class = 4
-    model = UNet(num_class) #, depth=5)    # torch.load("unet_mini_training.pth")    #
+    if LOAD_MODEL is True:
+        model = torch.load(MODEL_NAME)
+    else:
+        model = UNet(NUM_CLASS)
     model.to(device)
 
     # freeze backbone layers
@@ -62,36 +66,30 @@ def main():
 
     optimizer_ft = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-3)
 
-    exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=30, gamma=0.1)
-
-    # model = train_model(model, optimizer_ft, exp_lr_scheduler, num_epochs=60)
-
+    exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=20, gamma=0.5)
 
     """
     Here  it  could be separated into a method
     """
-    num_epochs = 30
-    reduce_every = 10
 
     start_time = time.time()
 
     optimizer = optimizer_ft
 
-    for epoch in range(num_epochs):
+    for epoch in range(NUM_EPOCHS):
 
         # Start the training phase of an epoch
         epoch_start = time.time()
 
-        print(f'\n{epoch_start - start_time} s elapsed\nEpoch {epoch + 1 }/{num_epochs}')
+        print(f'\n{epoch_start - start_time} s elapsed\nEpoch {epoch + 1 }/{NUM_EPOCHS}')
         print('-' * 10)
 
-        exp_lr_scheduler.step()
+        # exp_lr_scheduler.step()
 
         # Trainingphase
         model.train()
         epoch_samples = 0
         metrics = defaultdict(float)
-
 
         print("===== Training =====")
         # Imagewise Training
@@ -108,13 +106,12 @@ def main():
                 # track history if only in train
                 outputs = model.forward(images)
 
-                """
-                sum_set = np.sum(torch.sigmoid(outputs).cpu().detach().numpy(), axis=1)
-                numpy_set = torch.sigmoid(outputs).cpu().detach().numpy()
-                for i in range(sum_set.shape[0]):
-                    numpy_set[i, :, :, :] = np.divide(numpy_set[i, :, :, :], sum_set[i, :, :])
-                pyplot.imshow(numpy_set[0, 0, :, :], vmin=0, vmax=1)
-                """
+                # sum_set = np.sum(torch.sigmoid(outputs).cpu().detach().numpy(), axis=1)
+                # numpy_set = torch.sigmoid(outputs).cpu().detach().numpy()
+                # for i in range(sum_set.shape[0]):
+                #     numpy_set[i, :, :, :] = np.divide(numpy_set[i, :, :, :], sum_set[i, :, :])
+                # pyplot.imshow(numpy_set[0, 0, :, :], vmin=0, vmax=1)
+
 
                 # TODO BCE seems to be broken ?
                 # F.binary_cross_entropy_with_logits(outputs.float(), masks.float())
@@ -128,8 +125,6 @@ def main():
                 epoch_samples += images.size(0)
 
         print_metrics(metrics, epoch_samples, 'train')
-        epoch_loss = metrics['loss'] / epoch_samples
-
 
         # Validation phase
         model.eval()
@@ -148,7 +143,7 @@ def main():
                 outputs = model(images)
 
                 # TODO BCE seems to be broken ?
-                loss = calc_loss(outputs, masks, metrics)
+                loss = calc_loss(outputs, masks, metrics, all_losses = True)
 
                 # statistics
                 epoch_samples += images.size(0)
@@ -173,9 +168,8 @@ def main():
         epoch_end = time.time()
         """
 
-        if epoch % 5 == 0:
-
-            torch.save(model, 'unet_mini_training.pth')
+        if epoch % 5 == 0 and SAVE_MODEL:
+            torch.save(model, MODEL_NAME)
 
 
     end_time = time.time()
@@ -183,20 +177,36 @@ def main():
     pass
 
 
-def calc_loss(pred, target, metrics, bce_weight=0.5):
+def calc_loss(pred, target, metrics, bce_weight=0.5, all_losses=False):
+
     # Fix -> TODO find out why necessary and remove
     target = target.double()
     pred = pred.double()
-
-    bce = F.binary_cross_entropy_with_logits(pred, target)
-
     pred = torch.sigmoid(pred)
-    dice = dice_loss(pred, target)
 
-    loss = bce * bce_weight + dice * (1 - bce_weight)
+    if (UNET_LOSSFKT == "FOCAL"):
+        loss = FocalLoss2d().forward(pred, target)
+        metrics['focal'] += loss.data.cpu().numpy() * target.size(0)
 
-    metrics['bce'] += bce.data.cpu().numpy() * target.size(0)
-    metrics['dice'] += dice.data.cpu().numpy() * target.size(0)
+    elif (UNET_LOSSFKT == "BCE_DICE"):
+        bce = F.binary_cross_entropy_with_logits(pred, target)
+        dice = dice_loss(pred, target)
+        loss = bce * bce_weight + dice * (1 - bce_weight)
+        metrics['bce'] += bce.data.cpu().numpy() * target.size(0)
+        metrics['dice'] += dice.data.cpu().numpy() * target.size(0)
+
+    if all_losses:
+        floss = FocalLoss2d().forward(pred, target)
+        metrics['focal'] += floss.data.cpu().numpy() * target.size(0)
+
+        bce = F.binary_cross_entropy_with_logits(pred, target)
+        metrics['bce'] += bce.data.cpu().numpy() * target.size(0)
+
+        dice = dice_loss(pred, target)
+        metrics['dice'] += dice.data.cpu().numpy() * target.size(0)
+
+        loss = bce * 1./3 + dice * 1./3 + floss * 1./3
+
     metrics['loss'] += loss.data.cpu().numpy() * target.size(0)
 
     return loss
