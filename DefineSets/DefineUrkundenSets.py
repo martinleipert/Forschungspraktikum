@@ -12,10 +12,10 @@ Define the Notarsurkunden Sets for the UNet Training
 SCHEMA = "http://schema.primaresearch.org/PAGE/gts/pagecontent/2013-07-15"
 
 REGION_TYPES = {
-    "Background": 0,
-    "TextRegion": 1,
-    "ImageRegion": 2,
-    "GraphicRegion": 3
+	"Background": 0,
+	"TextRegion": 1,
+	"ImageRegion": 2,
+	"GraphicRegion": 3
 }
 
 # How many data of the set to use for  testing
@@ -25,7 +25,7 @@ PERCENTAGE_VALIDATION = 1. / 9.
 
 NOTARSURKUNDEN_SETS = "/home/martin/Forschungspraktikum/Testdaten/Segmentation_Sets/"
 NOTARSURKUNDEN_DIR = "/home/martin/Forschungspraktikum/Testdaten/Transkribierte_Notarsurkunden/" \
-                     "notarskurkunden_mom_restored/"
+					 "notarskurkunden_mom_restored/"
 
 REDUCE_SET = False
 REDUCTION = 0.5
@@ -40,6 +40,8 @@ def main():
 
 	for file in os.listdir(NOTARSURKUNDEN_DIR):
 		file_path = os.path.join(NOTARSURKUNDEN_DIR, file)
+
+		# Extract the image filename and check if it contains class assignments
 		if os.path.isfile(file_path):
 			if not file.lower().endswith('.jpg'):
 				continue
@@ -52,12 +54,11 @@ def main():
 
 			root = xml_tree.getroot()
 
+			# Filter unlabeled files
 			el_list = []
-
 			for key in REGION_TYPES.keys():
 				els = root.findall("*/" + ns + key)
 				el_list.extend(els)
-
 			if len(el_list) == 0:
 				continue
 
@@ -72,10 +73,12 @@ def main():
 	if REDUCE_SET:
 		nr_idx = nr_idx*REDUCTION
 
+	# Calculate the indices
 	perc_trainval = (1 - PERCENTAGE_TEST)
 	train_idx = numpy.round(nr_idx * perc_trainval * (1 - PERCENTAGE_VALIDATION))
 	val_idx = train_idx + numpy.round(nr_idx * perc_trainval * PERCENTAGE_VALIDATION)
 
+	# Compose the sets
 	train_set = file_list[0:int(train_idx-1)]
 	val_set = file_list[int(train_idx):int(val_idx-1)]
 	test_set = file_list[int(val_idx):int(numpy.round(nr_idx))]
@@ -85,12 +88,12 @@ def main():
 	if not os.path.exists(store_dir):
 		os.mkdir(store_dir)
 
+	# Wirte into a File
 	train_file = os.path.join(store_dir, "training.txt")
-	val_file = os.path.join(store_dir, "validation.txt")
-	test_file = os.path.join(store_dir, "test.txt")
-
 	store_list(train_file, train_set)
+	val_file = os.path.join(store_dir, "validation.txt")
 	store_list(val_file, val_set)
+	test_file = os.path.join(store_dir, "test.txt")
 	store_list(test_file, test_set)
 	pass
 

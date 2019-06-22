@@ -1,11 +1,11 @@
 from collections import defaultdict
 import torch.nn.functional as F
-from UNet.loss import dice_loss
+from UNet.DiceLoss import dice_loss
 import time
 import copy
 import torch
 # from UNet.pytorch_unet import UNet
-from UNet.BetterUNet import UNet
+from UNet.BatchNormUNet import UNet
 # from UNet.ThirdUNet import UNet
 from UNetLoader_dynamic import UNetDatasetDynamicMask
 from torch.optim import lr_scheduler
@@ -176,6 +176,7 @@ def main():
 
     pass
 
+# TODO functions and weightings in a dictionary
 
 def calc_loss(pred, target, metrics, bce_weight=0.5, all_losses=False):
 

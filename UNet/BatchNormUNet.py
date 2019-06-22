@@ -15,17 +15,12 @@ Martin Leipert
 26.04.2019
 """
 
+
 # Method to generate a convolutional layer
 # Contracting path
-def conv3x3(in_channels, out_channels, stride=1,
-	        padding=1, bias=True, groups=1):
-	return nn.Conv2d(in_channels,
-		out_channels,
-		kernel_size=3,
-		stride=stride,
-		padding=padding,
-		bias=bias,
-		groups=groups)
+def conv3x3(in_channels, out_channels, stride=1,  padding=1, bias=True, groups=1):
+	return nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=padding, bias=bias, groups=groups)
+
 
 # Method for the expanding path
 def upconv2x2(in_channels, out_channels, mode='transpose'):
@@ -42,6 +37,7 @@ def upconv2x2(in_channels, out_channels, mode='transpose'):
 			nn.Upsample(mode='bilinear', scale_factor=2),
 			conv1x1(in_channels, out_channels))
 
+
 # 1 by 1 convolution for the contracting path
 def conv1x1(in_channels, out_channels, groups=1):
 	return nn.Conv2d(
@@ -50,6 +46,7 @@ def conv1x1(in_channels, out_channels, groups=1):
 		kernel_size=1,
 		groups=groups,
 		stride=1)
+
 
 # Helper Module for the downward path
 # -> Construct tileable parts of a downward path
@@ -91,7 +88,7 @@ class UpConv(nn.Module):
 	A ReLU activation follows each convolution.
 	"""
 	def __init__(self, in_channels, out_channels,
-	             merge_mode='concat', up_mode='transpose'):
+				 merge_mode='concat', up_mode='transpose'):
 		super(UpConv, self).__init__()
 
 		self.in_channels = in_channels
@@ -103,7 +100,7 @@ class UpConv(nn.Module):
 		self.batch_norm2 = torch.nn.BatchNorm2d(self.out_channels)
 
 		self.upconv = upconv2x2(self.in_channels, self.out_channels,
-		                        mode=self.up_mode)
+								mode=self.up_mode)
 
 		if self.merge_mode == 'concat':
 			self.conv1 = conv3x3(
@@ -152,10 +149,7 @@ class UNet(nn.Module):
 	This channel halving happens with the convolution in
 	the tranpose convolution (specified by upmode='transpose')
 	"""
-
-	def __init__(self, num_classes, in_channels=3, depth=5,
-	             start_filts=64, up_mode='transpose',
-	             merge_mode='concat'):
+	def __init__(self, num_classes, in_channels=3, depth=5, start_filts=64, up_mode='transpose', merge_mode='concat'):
 		"""
 		Arguments:
 			in_channels: int, number of channels in the input tensor.
@@ -173,24 +167,24 @@ class UNet(nn.Module):
 			self.up_mode = up_mode
 		else:
 			raise ValueError("\"{}\" is not a valid mode for "
-			                 "upsampling. Only \"transpose\" and "
-			                 "\"upsample\" are allowed.".format(up_mode))
+							 "upsampling. Only \"transpose\" and "
+							 "\"upsample\" are allowed.".format(up_mode))
 
 		if merge_mode in ('concat', 'add'):
 			self.merge_mode = merge_mode
 		else:
 			raise ValueError("\"{}\" is not a valid mode for"
-			                 "merging up and down paths. "
-			                 "Only \"concat\" and "
-			                 "\"add\" are allowed.".format(up_mode))
+							 "merging up and down paths. "
+							 "Only \"concat\" and "
+							 "\"add\" are allowed.".format(up_mode))
 
 		# NOTE: up_mode 'upsample' is incompatible with merge_mode 'add'
 		if self.up_mode == 'upsample' and self.merge_mode == 'add':
 			raise ValueError("up_mode \"upsample\" is incompatible "
-			                 "with merge_mode \"add\" at the moment "
-			                 "because it doesn't make sense to use "
-			                 "nearest neighbour to reduce "
-			                 "depth channels (by half).")
+							 "with merge_mode \"add\" at the moment "
+							 "because it doesn't make sense to use "
+							 "nearest neighbour to reduce "
+							 "depth channels (by half).")
 
 		self.num_classes = num_classes
 		self.in_channels = in_channels

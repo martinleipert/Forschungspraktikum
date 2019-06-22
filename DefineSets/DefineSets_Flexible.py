@@ -22,8 +22,14 @@ STORE_FILE = "full_set"
 TAG_TRAINING_SET = "TRAINING_SET"
 TAG_TEST_SET = "TEST_SET"
 TAG_VALIDATION_SET = "VALIDATION_SET"
+
 TAG_URKUNDEN = "URKUNDEN"
 TAG_KEINE_URKUNDEN = "KEINE_URKUNDEN"
+
+# How many data of the set to use for  testing
+PERCENTAGE_TEST = 0.25
+# Percentage of the data in training actually used for validation
+PERCENTAGE_VALIDATION = 1. / 3.
 
 MODE = 1
 
@@ -32,36 +38,11 @@ REDUCTION = 0.1
 BALANCE_SET = False
 
 
-def balance_sets(data_sets):
-	len_list = list()
-
-	for data_set in data_sets:
-		random.shuffle(data_set)
-		len_list.append(len(data_set))
-
-	smallest = min(len_list)
-
-	new_sets = list()
-	for data_set in data_sets:
-		new_sets.append(data_set[0:smallest])
-
-	return new_sets
-
-
-def reduce_sets(data_sets, factor):
-	new_sets = []
-	for data_set in data_sets:
-		new_last_idx = int(numpy.ceil(len(data_set)*factor))
-		new_sets.append(data_set[0:new_last_idx])
-
-	return new_sets
-
-
 # Main method which shuffles and splits the sets
 def main():
 	# Get the filelist from the directories
-	set_notarsurkunden = listfiles_fullpath(NOTARSURKUNDEN_DIR)
-	set_keine_urkunden = listfiles_fullpath(KEINEURKUNDEN_DIR)
+	set_notarsurkunden = list_files_full_path(NOTARSURKUNDEN_DIR)
+	set_keine_urkunden = list_files_full_path(KEINEURKUNDEN_DIR)
 
 	if REDUCE_SET:
 		set_notarsurkunden, set_keine_urkunden = reduce_sets([set_notarsurkunden, set_keine_urkunden], REDUCTION)
@@ -69,15 +50,12 @@ def main():
 	if BALANCE_SET:
 		set_notarsurkunden, set_keine_urkunden = balance_sets([set_notarsurkunden, set_keine_urkunden])
 
-	# How many data of the set to use for  testing
-	PERCENTAGE_TEST = 0.25
-
-	# Percentage of the data in training actually used for validation
-	PERCENTAGE_VALIDATION = 1. / 3.
-
 	# Get the sets
+	# Notary documents
 	training_urkunden, validation_urkunden, test_urkunden = \
 		split_set(set_notarsurkunden, PERCENTAGE_TEST, PERCENTAGE_VALIDATION)
+
+	# Not notary documents
 	(training_keine_urkunden, validation_keine_urkunden, test_keine_urkunden) = \
 		split_set(set_keine_urkunden, PERCENTAGE_TEST, PERCENTAGE_VALIDATION)
 
@@ -129,6 +107,7 @@ def main():
 		store_list(os.path.join(STORE_DIR, STORE_FILE, "testdata.txt"), test_set)
 
 
+# Store as file list in plain text
 def store_list(outputfile, data_label_list):
 	outputdir = os.path.dirname(outputfile)
 	if not os.path.exists(outputdir):
@@ -151,7 +130,7 @@ def store_list(outputfile, data_label_list):
 
 
 # Method to generate the filepaths for a directory
-def listfiles_fullpath(directory):
+def list_files_full_path(directory):
 	files = os.listdir(directory)
 	files = [os.path.join(directory, file) for file in files]
 	files = list(filter(lambda x: os.path.isfile(x) and x.lower().endswith('jpg'), files))
@@ -163,36 +142,55 @@ def split_set(data_set, percentage_test, percentage_validation):
 	# Shuffle the dataset to randomize
 	random.shuffle(data_set)
 
-	# region set size calculation
 	# Count the files
 	no_data = len(data_set)
-
 	# calculate the sizes of the sets
 	no_testset = int(numpy.floor(percentage_test * no_data))
-
 	# Calculate how much data are left fore training and validation
 	no_train_and_val = no_data - no_testset
-
 	# Calculate how much data to use for validation and training
 	no_validation = int(numpy.floor(no_train_and_val * percentage_validation))
-	# endregion set size calculation
 
-	# region indices
 	# calculate the indices for set splitting
 	end_idx_test = no_testset
 	end_idx_val = no_testset + no_validation
 	end_idx_train = no_data
 
-	# endregion indices
-
-	# region splitting
 	# split the set
 	test_data = data_set[0:end_idx_test]
 	validation_data = data_set[end_idx_test:end_idx_val]
 	training_data = data_set[end_idx_val:end_idx_train]
 
-	# endregion splitting
 	return training_data, validation_data, test_data
+
+
+#  region Helpers for Class Distribution
+# To equalize the nr of samples of each clas
+def balance_sets(data_sets):
+	len_list = list()
+
+	for data_set in data_sets:
+		random.shuffle(data_set)
+		len_list.append(len(data_set))
+
+	smallest = min(len_list)
+
+	new_sets = list()
+	for data_set in data_sets:
+		new_sets.append(data_set[0:smallest])
+
+	return new_sets
+
+
+def reduce_sets(data_sets, factor):
+	new_sets = []
+	for data_set in data_sets:
+		new_last_idx = int(numpy.ceil(len(data_set)*factor))
+		new_sets.append(data_set[0:new_last_idx])
+
+	return new_sets
+# endregion Helpers for Class Distribution
+
 
 
 if __name__ == '__main__':
