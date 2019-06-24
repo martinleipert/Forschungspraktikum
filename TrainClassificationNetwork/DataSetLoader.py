@@ -8,19 +8,13 @@ from PIL import Image
 import os
 import os.path
 import re
-from albumentations import (
-    HorizontalFlip, IAAPerspective, ShiftScaleRotate, CLAHE, RandomRotate90,
-    Transpose, ShiftScaleRotate, Blur, OpticalDistortion, GridDistortion, HueSaturationValue,
-    IAAAdditiveGaussianNoise, GaussNoise, MotionBlur, MedianBlur, IAAPiecewiseAffine,
-    IAASharpen, IAAEmboss, RandomBrightnessContrast, Flip, OneOf, Compose
-)
 import random
+from Augmentations.Augmentations import *
 
 Image.LOAD_TRUNCATED_IMAGES = True
 
 
-def default_loader(path):
-
+def augmentation_loader(path, augmentation=None):
 	image = Image.open(path)
 
 	for i in range(3):
@@ -29,12 +23,7 @@ def default_loader(path):
 		except Exception as e:
 			pass
 
-	return image.convert('RGB')
-
-
-def scale_loader(path, augmentation=None):
-
-	image = default_loader(path)
+	image = image.convert('RGB')
 
 	if augmentation:
 		try:
@@ -50,6 +39,7 @@ def scale_loader(path, augmentation=None):
 	return image
 
 
+# Read the previously defined filelist (from Define Sets)
 def default_flist_reader(flist):
 	"""
 	flist format: impath label\nimpath label\n ...(same to caffe's filelist)
@@ -59,78 +49,20 @@ def default_flist_reader(flist):
 		for line in rf.readlines():
 			try:
 				stripped_line = line.strip()
-				# impath, imlabel = stripped_line.split()
-				impath, imlabel = re.search("(.*?)\s+(\d)", stripped_line).groups()
-				imlist.append((impath, int(imlabel)))
+				im_path, im_label = re.search(r"(.*?)\s+(\d)", stripped_line).groups()
+				imlist.append((im_path, int(im_label)))
 			except Exception as e:
 				pass
-			if os.path.isdir(impath):
+			if os.path.isdir(im_path):
 				pass
 
 	return imlist
-
-
-def unlabeled_flist_reader(flist):
-	"""
-	flist format: impath\nimpath\n ...
-	"""
-	imlist = []
-	with open(flist, 'r') as rf:
-		for line in rf.readlines():
-			try:
-				stripped_line = line.strip()
-				impath = re.search("(.*?)\n", stripped_line).group(0)
-				imlist.append(impath)
-			except Exception as e:
-				pass
-			if os.path.isdir(impath):
-				pass
-	random.shuffle(imlist)
-
-	return imlist
-
-def strong_aug(p=0.9):
-	return Compose([
-		Flip(),
-		OneOf([
-	        IAAAdditiveGaussianNoise(),
-	        GaussNoise()
-	    ], p=0.2),
-	    OneOf([
-	        MotionBlur(p=0.2),
-	        MedianBlur(blur_limit=3, p=0.1),
-	        Blur(blur_limit=3, p=0.1),
-	    ], p=0.2),
-	    ShiftScaleRotate(shift_limit=0.15, scale_limit=0.1, rotate_limit=5, p=0.3),
-	    OneOf([
-	        OpticalDistortion(p=0.3),
-	        GridDistortion(p=0.1),
-	        IAAPiecewiseAffine(p=0.3),
-	    ], p=0.2),
-	    OneOf([
-	        CLAHE(clip_limit=2),
-	        IAASharpen(),
-	        IAAEmboss(),
-	        RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.),
-	    ], p=0.3),
-	    HueSaturationValue(p=0.3),
-	], p=p)
-
-def simple_augmentation(img):
-	trafo1 = strong_aug(p=0.9)
-
-	try:
-		return trafo1(image=img)['image']
-	# TODO more elegant -> I don't know why I need to do this fix
-	except Exception as e:
-		pass
-	return img
 
 
 class ImageFilelist(data.Dataset):
 
-	def __init__(self, root, flist, transform=None, target_transform=None, augmentation=None,
-			flist_reader=default_flist_reader, loader=scale_loader, enrich_factor=1):
+	def __init__(self, root, flist, transform=None, target_transform=None, augmentation=weak_augmentation(),
+	             flist_reader=default_flist_reader, loader=augmentation_loader, enrich_factor=1):
 		self.enrich_factor = enrich_factor
 		self.root   = root
 		self.imlist = flist_reader(flist)
@@ -138,11 +70,11 @@ class ImageFilelist(data.Dataset):
 		if enrich_factor <= 1:
 			self.imlist = self.imlist
 		else:
-			self.imlist = ImageFilelist.enrich_imlist(self.imlist, enrich_factor)
+			self.imlist = ImageFilelist.augment_imlist(self.imlist, enrich_factor)
 		self.transform = transform
 		self.target_transform = target_transform
 		self.loader = loader
-		self.augmentation = strong_aug(p=0.9)
+		self.augmentation = augmentation
 
 	def __getitem__(self, index):
 		impath, target = self.imlist[index]
@@ -158,13 +90,13 @@ class ImageFilelist(data.Dataset):
 		return len(self.imlist)
 
 	@classmethod
-	def enrich_imlist(cls, imlist, enrich_factor):
+	def augment_imlist(cls, im_list, enrich_factor):
 
 		enrich_label = 1
 
 		enriched_list = []
 
-		for image, im_label in imlist:
+		for image, im_label in im_list:
 
 			if im_label != enrich_label:
 				enriched_list.append((image, im_label))

@@ -3,6 +3,7 @@ from DataSetLoader import ImageFilelist
 import torch
 from Augmentations.Augmentations import weak_augmentation
 
+
 from torch import nn
 from torch import optim
 
@@ -18,13 +19,15 @@ TRAINING_SET = f"/home/martin/Forschungspraktikum/Testdaten/Sets/{CHOSEN_SET}/tr
 VALIDATION_SET = f"/home/martin/Forschungspraktikum/Testdaten/Sets/{CHOSEN_SET}/validationdata.txt"
 TEST_SET = f"/home/martin/Forschungspraktikum/Testdaten/Sets/{CHOSEN_SET}/testdata.txt"
 
-LEARNING_RATE = 5e-4
+LEARNING_RATE = 1e-3
 BATCH_SIZE = 128
 NUM_CLASSES = 2
 
 # Parametrization for the training
 EPOCHS = 60
 PRINT_EVERY = 25
+# Step size of Learning rate decay
+LR_STEP_SIZE = 20
 # endregion
 
 MODEL_PATHS = {
@@ -37,8 +40,11 @@ TRAIN_FRESH = True
 MODEL_NAME = "RESNET_18"
 MODEL_PATH = "%s_%s" % (CHOSEN_SET, MODEL_PATHS[MODEL_NAME])
 
+# "CE_LOSS" "NN_LOSS"
+LOSS_FKT = "NN_LOSS"
 
 def main():
+	pyplot.ion()
 	t0 = time.time()
 
 	"""
@@ -96,10 +102,11 @@ def main():
 				nn.Linear(512, BATCH_SIZE), nn.ReLU(), nn.Dropout(0.2), nn.Linear(BATCH_SIZE, 2),
 				nn.LogSoftmax(dim=1))
 
-		# for param in model_network.parameters():
-		#  	param.requires_grad = False
 	else:
 		model_network = torch.load(MODEL_PATH)
+
+	# for param in model_network.parameters():
+	#  	param.requires_grad = False
 
 	# To GPU (or CPU if trained on CPU)
 	model_network.to(device)
@@ -117,6 +124,7 @@ def main():
 	# Optimzer
 	lr = LEARNING_RATE
 	optimizer = optim.Adam(model_network.parameters(), lr=lr)
+	exp_lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=LR_STEP_SIZE, gamma=0.5)
 
 	"""
 	Plotting
@@ -127,21 +135,21 @@ def main():
 	loss_ax.set_xlabel("Epochs")
 	loss_ax.set_ylabel("")
 	loss_ax.set_ylim([0, 1])
-	loss_ax.set_title("Loss-Curves of DenseNet121")
+	loss_ax.set_title("Loss-Curves of %s" % MODEL_NAME)
 
 	train_loss_curve, = loss_ax.plot([], 'b-', label="Training Loss")
 	validation_loss_curve, = loss_ax.plot([], 'r-', label="Validation Loss")
 	loss_fig.show()
+	pyplot.pause(0.05)
 
 	"""
 	Model training
 	"""
 	# Running variables
 	steps = 0
-	running_loss = 0
 
 	# Store losses
-	train_loss, validation_losses = [], []
+	train_losses, validation_losses = [], []
 
 	t1 = time.time()
 
@@ -153,9 +161,7 @@ def main():
 
 	for epoch in range(EPOCHS):
 
-		if epoch == 15:
-			lr = LEARNING_RATE * 1e-1
-			optimizer = optim.Adam(model_network.parameters(), lr=lr)
+		exp_lr_scheduler.step()
 
 		model_network.train()
 		running_loss = 0
@@ -172,8 +178,9 @@ def main():
 			running_loss += loss.item()
 
 			# Update the losses
-			train_loss.append(running_loss / len(training_loader))
-			train_loss_curve.set_ydata(numpy.array(train_loss))
+			train_losses.append(running_loss / len(training_loader))
+			train_loss_curve.set_xdata(range(len(train_losses)))
+			train_loss_curve.set_ydata(numpy.array(train_losses))
 
 
 		# Validation
@@ -208,10 +215,14 @@ def main():
 
 			t2 = time.time()
 
-			validation_losses.append(validation_loss/len(validation_loader))
 
 			# Update the plots
-			validation_loss_curve.set_ydata(numpy.array(validation_loss))
+			validation_losses.append(validation_loss/len(validation_loader))
+			validation_loss_curve.set_xdata(range(len(validation_losses)))
+			validation_loss_curve.set_ydata(numpy.array(validation_losses))
+
+			loss_ax.set_xlim((0, len(validation_losses)-1))
+			pyplot.pause(0.05)
 
 			# Print the losses
 			print(f" {t2-t0} - Epoch {epoch+1}/{EPOCHS}.. Train loss: {running_loss / PRINT_EVERY:.3f}.. "

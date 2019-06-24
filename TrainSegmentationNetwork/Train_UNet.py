@@ -28,8 +28,10 @@ FILE_LIST_TRAINING = "/home/martin/Forschungspraktikum/Testdaten/Segmentation_Se
 FILE_LIST_VALIDATION = "/home/martin/Forschungspraktikum/Testdaten/Segmentation_Sets/%s/validation.txt" % SET_NAME
 
 BATCH_SIZE = 5
-NUM_EPOCHS = 25
 NUM_CLASS = 4
+NUM_EPOCHS = 45
+# Step size of Learning rate decay
+LR_STEP_SIZE = 15
 
 # FOCAL or BCE_DICE
 UNET_LOSSFKT = "FOCAL"
@@ -37,6 +39,18 @@ LOAD_MODEL = False
 SAVE_MODEL = False
 MODEL_NAME = "unet_full_training.pth"
 
+
+TRAIN_LOSSES_WEIGHTING = {
+    "BCE_LOSS" : 0,
+    "DICE_LOSS" : 0,
+    "FOCAL_LOSS" : 1
+}
+
+VAL_LOSSES_WEIGHTING = {
+    "BCE_LOSS" : 0.33,
+    "DICE_LOSS" : 0.33,
+    "FOCAL_LOSS" : 0.33
+}
 
 
 def main():
@@ -47,8 +61,8 @@ def main():
     validation_data = UNetDatasetDynamicMask(FILE_LIST_VALIDATION, region_select=False)
 
     # Define the DataLoader
-    trainloader = torch.utils.data.DataLoader(training_data, batch_size=BATCH_SIZE)
-    validationloader = torch.utils.data.DataLoader(validation_data, batch_size=BATCH_SIZE)
+    train_loader = torch.utils.data.DataLoader(training_data, batch_size=BATCH_SIZE)
+    validation_loader = torch.utils.data.DataLoader(validation_data, batch_size=BATCH_SIZE)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(device)
@@ -64,13 +78,30 @@ def main():
     #    for param in l.parameters():
     #        param.requires_grad = False
 
-    optimizer_ft = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-3)
-
-    exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=20, gamma=0.5)
+    optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-3)
+    exp_lr_scheduler = lr_scheduler.StepLR(optimizer, step_size=LR_STEP_SIZE, gamma=0.5)
 
     """
     Here  it  could be separated into a method
     """
+    train_losses = []
+    validation_losses = []
+
+    """
+    Plotting
+    """
+    # Prepare the plots
+    loss_fig = pyplot.figure(1, figsize=(10, 7))
+    loss_ax = loss_fig.add_subplot(111)
+    loss_ax.set_xlabel("Epochs")
+    loss_ax.set_ylabel("")
+    loss_ax.set_ylim([0, 1])
+    loss_ax.set_title("Loss-Curves of %s" % MODEL_NAME)
+
+    train_loss_curve, = loss_ax.plot([], 'b-', label="Training Loss")
+    validation_loss_curve, = loss_ax.plot([], 'r-', label="Validation Loss")
+    loss_fig.show()
+    pyplot.pause(0.05)
 
     start_time = time.time()
 
@@ -84,7 +115,7 @@ def main():
         print(f'\n{epoch_start - start_time} s elapsed\nEpoch {epoch + 1 }/{NUM_EPOCHS}')
         print('-' * 10)
 
-        # exp_lr_scheduler.step()
+        exp_lr_scheduler.step()
 
         # Trainingphase
         model.train()
@@ -95,7 +126,7 @@ def main():
         # Imagewise Training
         with torch.set_grad_enabled(True):
 
-            for images, masks in trainloader:
+            for images, masks in train_loader:
                 images = images.to(device)
                 masks = masks.to(device)
 
@@ -115,7 +146,7 @@ def main():
 
                 # TODO BCE seems to be broken ?
                 # F.binary_cross_entropy_with_logits(outputs.float(), masks.float())
-                loss = calc_loss(outputs, masks, metrics)
+                loss = calc_loss(outputs, masks, metrics, TRAIN_LOSSES_WEIGHTING)
 
                 # backward + optimize only if in training phase
                 loss.backward()
@@ -126,13 +157,18 @@ def main():
 
         print_metrics(metrics, epoch_samples, 'train')
 
+        train_loss = metrics['loss']
+        train_losses.append(train_loss)
+        train_loss_curve.set_xdata(range(len(train_losses)))
+        train_loss_curve.set_ydata(np.array(train_losses))
+
         # Validation phase
         model.eval()
         metrics = defaultdict(float)
         epoch_samples = 0
         print("===== Validation =====")
         with torch.set_grad_enabled(False):
-            for images, masks in validationloader:
+            for images, masks in validation_loader:
                 images = images.to(device)
                 masks = masks.to(device)
 
@@ -142,75 +178,60 @@ def main():
                 # track history if only in train
                 outputs = model(images)
 
-                # TODO BCE seems to be broken ?
-                loss = calc_loss(outputs, masks, metrics, all_losses = True)
+                loss = calc_loss(outputs, masks, metrics, VAL_LOSSES_WEIGHTING)
 
                 # statistics
                 epoch_samples += images.size(0)
 
         print_metrics(metrics, epoch_samples, 'validation')
 
-        """
-        pred_array = np.array(outputs[0, 0, :, :].cpu().detach())
-        mask_array = np.array(masks[0, 0, :, :].cpu().detach())
-
-        figure = pyplot.figure(0)
-        ax1 = figure.add_subplot(1, 2, 1)
-        ax2 = figure.add_subplot(1, 2, 2)
-
-        ax1.imshow(mask_array)
-        ax2.imshow(pred_array)
-
-        figure.show()
-        # Evaluationphase
-        model.eval()
-
-        epoch_end = time.time()
-        """
+        val_loss = metrics['loss']
+        validation_losses.append(val_loss)
+        validation_loss_curve.set_xdata(range(len(validation_losses)))
+        validation_loss_curve.set_ydata(np.array(validation_losses))
+        loss_ax.set_xlim((0, len(validation_losses) - 1))
+        pyplot.pause(0.05)
 
         if epoch % 5 == 0 and SAVE_MODEL:
             torch.save(model, MODEL_NAME)
-
 
     end_time = time.time()
 
     pass
 
-# TODO functions and weightings in a dictionary
 
-def calc_loss(pred, target, metrics, bce_weight=0.5, all_losses=False):
+# TODO functions and weightings in a dictionary
+def calc_loss(pred, target, metrics, losses_weighting):
 
     # Fix -> TODO find out why necessary and remove
     target = target.double()
-    pred = pred.double()
-    pred = torch.sigmoid(pred)
+    pred = torch.sigmoid(pred.double())
 
-    if (UNET_LOSSFKT == "FOCAL"):
-        loss = FocalLoss2d().forward(pred, target)
+    focal_weight = losses_weighting["FOCAL_LOSS"]
+    dice_weight = losses_weighting["DICE_LOSS"]
+    bce_weight = losses_weighting["BCE_LOSS"]
+
+    total_weight = focal_weight + dice_weight + bce_weight
+
+    focal_loss, bce_loss, dice = (0, 0, 0)
+
+    if focal_weight > 0:
+        focal_loss = FocalLoss2d().forward(pred, target)
         metrics['focal'] += loss.data.cpu().numpy() * target.size(0)
 
-    elif (UNET_LOSSFKT == "BCE_DICE"):
-        bce = F.binary_cross_entropy_with_logits(pred, target)
-        dice = dice_loss(pred, target)
-        loss = bce * bce_weight + dice * (1 - bce_weight)
-        metrics['bce'] += bce.data.cpu().numpy() * target.size(0)
-        metrics['dice'] += dice.data.cpu().numpy() * target.size(0)
-
-    if all_losses:
-        floss = FocalLoss2d().forward(pred, target)
-        metrics['focal'] += floss.data.cpu().numpy() * target.size(0)
-
-        bce = F.binary_cross_entropy_with_logits(pred, target)
-        metrics['bce'] += bce.data.cpu().numpy() * target.size(0)
-
+    if dice_weight > 0:
         dice = dice_loss(pred, target)
         metrics['dice'] += dice.data.cpu().numpy() * target.size(0)
 
-        loss = bce * 1./3 + dice * 1./3 + floss * 1./3
+    if bce_weight > 0:
+        bce_loss = F.binary_cross_entropy_with_logits(pred, target)
+        metrics['bce'] += bce_loss.data.cpu().numpy() * target.size(0)
 
-    metrics['loss'] += loss.data.cpu().numpy() * target.size(0)
+    sum_loss = (bce_loss * bce_weight + dice * dice_weight + focal_loss * focal_weight) / total_weight
 
-    return loss
+    metrics['loss'] += sum_loss.data.cpu().numpy() * target.size(0)
+
+    return sum_loss
 
 
 def print_metrics(metrics, epoch_samples, phase):

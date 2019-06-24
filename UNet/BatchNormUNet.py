@@ -13,6 +13,8 @@ https://github.com/jaxony/unet-pytorch/blob/master/model.py
 Modified by
 Martin Leipert
 26.04.2019
+
+Implemented Batch normalization
 """
 
 

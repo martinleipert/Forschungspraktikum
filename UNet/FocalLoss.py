@@ -1,17 +1,13 @@
-####################################################
-##### This is focal loss class for multi class #####
-####################################################
+"""
+Focal loss for segmentaton
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.autograd import Variable
+Modified and rewritten by
+Martin Leipert
+martin.leipert@fau.de
 
-
-####################################################
-##### This is focal loss class for multi class #####
-##### University of Tokyo Doi Kento            #####
-####################################################
+Originally by
+University of Tokyo Doi Kento 
+"""
 
 import torch
 import torch.nn as nn
@@ -52,8 +48,6 @@ class FocalLoss2d(nn.Module):
 		pt_c = ones - target
 
 		weight = Variable(self.weight)
-		# logpt = -F.cross_entropy(input, target.long())
-		# pt = torch.exp(logpt)
 		pt = ones + target*p - pt_c*p
 
 		logpt = torch.log(pt)
