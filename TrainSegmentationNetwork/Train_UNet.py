@@ -10,10 +10,13 @@ from UNet.BatchNormUNet import UNet
 from UNetLoader_dynamic import UNetDatasetDynamicMask
 from torch.optim import lr_scheduler
 from UNet.FocalLoss import FocalLoss2d
+import logging
 
+import sys
 from matplotlib import pyplot
 import numpy as np
 
+# TODO implement logging -> Loss and recognition
 """
 Martin Leipert
 martin.leipert@fau.de
@@ -52,6 +55,20 @@ VAL_LOSSES_WEIGHTING = {
     "FOCAL_LOSS" : 0.33
 }
 
+__LOG_PATH = f"Training_Log_{MODEL_NAME}_{SET_NAME}.txt"
+formatter = logging.Formatter('%(asctime)s\n%(message)s')
+
+file_handler = logging.FileHandler(__LOG_PATH)
+file_handler.setLevel(logging.DEBUG)
+file_handler.setFormatter(formatter)
+cmd_handler = logging.StreamHandler(sys.stdout)
+cmd_handler.setLevel(logging.DEBUG)
+cmd_handler.setFormatter(formatter)
+
+__LOGGER__ = logging.Logger("Training Logger")
+__LOGGER__.addHandler(file_handler)
+__LOGGER__.addHandler(cmd_handler)
+
 
 def main():
     torch.cuda.empty_cache()
@@ -68,7 +85,8 @@ def main():
     print(device)
 
     if LOAD_MODEL is True:
-        model = torch.load(MODEL_NAME)
+        model = UNet(NUM_CLASS)
+        model.load_state_dict(torch.load("TrainedModels/%s" % MODEL_NAME))
     else:
         model = UNet(NUM_CLASS)
     model.to(device)
@@ -105,8 +123,6 @@ def main():
 
     start_time = time.time()
 
-    optimizer = optimizer_ft
-
     for epoch in range(NUM_EPOCHS):
 
         # Start the training phase of an epoch
@@ -122,11 +138,12 @@ def main():
         epoch_samples = 0
         metrics = defaultdict(float)
 
-        print("===== Training =====")
+        __LOGGER__.info("===== Training =====")
         # Imagewise Training
         with torch.set_grad_enabled(True):
 
-            for images, masks in train_loader:
+            for images, masks, image_paths in train_loader:
+
                 images = images.to(device)
                 masks = masks.to(device)
 
@@ -166,9 +183,9 @@ def main():
         model.eval()
         metrics = defaultdict(float)
         epoch_samples = 0
-        print("===== Validation =====")
+        __LOGGER__.info("===== Validation =====")
         with torch.set_grad_enabled(False):
-            for images, masks in validation_loader:
+            for images, masks, image_paths in validation_loader:
                 images = images.to(device)
                 masks = masks.to(device)
 
@@ -191,11 +208,13 @@ def main():
         validation_loss_curve.set_ydata(np.array(validation_losses))
         loss_ax.set_xlim((0, len(validation_losses) - 1))
         pyplot.pause(0.05)
+        loss_fig.savefig("%s_%s.png" % (MODEL_NAME, SET_NAME), dpi=200)
 
-        if epoch % 5 == 0 and SAVE_MODEL:
-            torch.save(model, MODEL_NAME)
+        if epoch % 5 == 4 and SAVE_MODEL:
+            torch.save_state_dict(model.state_dict(), "TrainedModels/%s" % MODEL_NAME)
 
     end_time = time.time()
+    torch.save_state_dict(model.state_dict(), "TrainedModels/%s" % MODEL_NAME)
 
     pass
 
@@ -217,7 +236,7 @@ def calc_loss(pred, target, metrics, losses_weighting):
 
     if focal_weight > 0:
         focal_loss = FocalLoss2d().forward(pred, target)
-        metrics['focal'] += loss.data.cpu().numpy() * target.size(0)
+        metrics['focal'] += focal_loss.data.cpu().numpy() * target.size(0)
 
     if dice_weight > 0:
         dice = dice_loss(pred, target)
@@ -239,7 +258,7 @@ def print_metrics(metrics, epoch_samples, phase):
     for k in metrics.keys():
         outputs.append("{}: {:4f}".format(k, metrics[k] / epoch_samples))
 
-    print("{}: {}".format(phase, ", ".join(outputs)))
+    __LOGGER__.info("{}: {}".format(phase, ", ".join(outputs)))
 
 
 def plot_helper(dataset, selector):

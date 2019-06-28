@@ -1,7 +1,7 @@
 import torchvision.models as models
 from DataSetLoader import ImageFilelist
 import torch
-from Augmentations.Augmentations import weak_augmentation
+from Augmentations.Augmentations import weak_augmentation, moderate_augmentation, heavy_augmentation
 
 
 from torch import nn
@@ -9,11 +9,16 @@ from torch import optim
 
 import time
 import numpy
+import sys
 
 from matplotlib import pyplot
 
+import logging
+
+
+# TODO implement logging -> loss and recognition
 # region Parameters
-CHOSEN_SET = "mini_set"
+CHOSEN_SET = "equalized_set"
 
 TRAINING_SET = f"/home/martin/Forschungspraktikum/Testdaten/Sets/{CHOSEN_SET}/traindata.txt"
 VALIDATION_SET = f"/home/martin/Forschungspraktikum/Testdaten/Sets/{CHOSEN_SET}/validationdata.txt"
@@ -24,10 +29,10 @@ BATCH_SIZE = 128
 NUM_CLASSES = 2
 
 # Parametrization for the training
-EPOCHS = 60
+EPOCHS = 30
 PRINT_EVERY = 25
 # Step size of Learning rate decay
-LR_STEP_SIZE = 20
+LR_STEP_SIZE = 10
 # endregion
 
 MODEL_PATHS = {
@@ -43,22 +48,47 @@ MODEL_PATH = "%s_%s" % (CHOSEN_SET, MODEL_PATHS[MODEL_NAME])
 # "CE_LOSS" "NN_LOSS"
 LOSS_FKT = "NN_LOSS"
 
+"""
+Setup the logger
+"""
+__LOG_PATH = f"Training_Log_{MODEL_NAME}_{CHOSEN_SET}.txt"
+formatter = logging.Formatter('%(asctime)s\n%(message)s')
+
+file_handler = logging.FileHandler(__LOG_PATH)
+file_handler.setLevel(logging.DEBUG)
+file_handler.setFormatter(formatter)
+cmd_handler = logging.StreamHandler(sys.stdout)
+cmd_handler.setLevel(logging.DEBUG)
+cmd_handler.setFormatter(formatter)
+
+__LOGGER__ = logging.Logger("Training Logger")
+__LOGGER__.addHandler(file_handler)
+__LOGGER__.addHandler(cmd_handler)
+
+
 def main():
+
 	pyplot.ion()
 	t0 = time.time()
+
+	__LOGGER__.info(f"Start Training of {MODEL_NAME}\n"
+					f"Training on {CHOSEN_SET}\n"
+					"Learning Rate: {LEARNING_RATE}\n"
+					f"Batch size: {BATCH_SIZE}\n"
+					f"Epochs: {EPOCHS}\n"
+					f"Learning Rate Step Size: {LR_STEP_SIZE}\n"
+					f"Loss function: {LOSS_FKT}\n")
 
 	"""
 	Prepare the data
 	"""
 	# Load with self written FIle loader
-	training_data = ImageFilelist('.', TRAINING_SET, enrich_factor=8, augmentation=weak_augmentation)
+	training_data = ImageFilelist('.', TRAINING_SET, enrich_factor=1, augmentation=moderate_augmentation)
 	validation_data = ImageFilelist('.', VALIDATION_SET)
-	test_data = ImageFilelist('.', TEST_SET)
 
 	# Define the DataLoader
 	training_loader = torch.utils.data.DataLoader(training_data, batch_size=BATCH_SIZE)
 	validation_loader = torch.utils.data.DataLoader(validation_data, batch_size=BATCH_SIZE)
-	test_loader = torch.utils.data.DataLoader(test_data, batch_size=BATCH_SIZE)
 
 	# Count the classes for weighting
 	n_training_data = len(training_data.imlist)
@@ -83,27 +113,28 @@ def main():
 	# Train on CUDA if possible
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-	if TRAIN_FRESH is True:
-		if MODEL_NAME == "DENSETNET_121":
-			# Pick the model
-			model_network = models.densenet121(pretrained=True)
-			# -> Map the 1000 outputs to the 2 class problem
-			model_network.classifier = nn.Linear(1024, NUM_CLASSES)
+	if MODEL_NAME == "DENSETNET_121":
+		# Pick the model
+		model_network = models.densenet121(pretrained=TRAIN_FRESH)
 
-		elif MODEL_NAME == "RESNET_50":
-			model_network = models.resnet50(pretrained=True)
-			model_network.fc = nn.Sequential(
-				nn.Linear(2048, BATCH_SIZE), nn.ReLU(), nn.Dropout(0.2), nn.Linear(BATCH_SIZE, 2),
-				nn.LogSoftmax(dim=1))
+		# -> Map the 1000 outputs to the 2 class problem
+		model_network.classifier = nn.Linear(1024, NUM_CLASSES)
 
-		elif MODEL_NAME == "RESNET_18":
-			model_network = models.resnet18(pretrained=True)
-			model_network.fc = nn.Sequential(
-				nn.Linear(512, BATCH_SIZE), nn.ReLU(), nn.Dropout(0.2), nn.Linear(BATCH_SIZE, 2),
-				nn.LogSoftmax(dim=1))
+	elif MODEL_NAME == "RESNET_50":
+		model_network = models.resnet50(pretrained=TRAIN_FRESH)
+		model_network.fc = nn.Sequential(
+			nn.Linear(2048, BATCH_SIZE), nn.ReLU(), nn.Dropout(0.2), nn.Linear(BATCH_SIZE, 2),
+			nn.LogSoftmax(dim=1))
 
-	else:
-		model_network = torch.load(MODEL_PATH)
+	elif MODEL_NAME == "RESNET_18":
+		model_network = models.resnet18(pretrained=TRAIN_FRESH)
+		model_network.fc = nn.Sequential(
+			nn.Linear(512, BATCH_SIZE), nn.ReLU(), nn.Dropout(0.2), nn.Linear(BATCH_SIZE, 2),
+			nn.LogSoftmax(dim=1))
+
+	# Load state dict
+	if not TRAIN_FRESH:
+		model_network.load_state_dict(torch.load("TrainedModels/%s" % MODEL_PATH))
 
 	# for param in model_network.parameters():
 	#  	param.requires_grad = False
@@ -111,12 +142,15 @@ def main():
 	# To GPU (or CPU if trained on CPU)
 	model_network.to(device)
 
-	if MODEL_NAME in ["DENSENET_121"]:
+	# One could use the same functions for both networks?
+	# Cross Entropy -> Quality of probability density function
+	if LOSS_FKT is "CROSS_ENTROPY":
 		# Two differently parametrized loss functions for training and validation
 		training_criterion = nn.CrossEntropyLoss(weight=torch.from_numpy(numpy.float32(weights)).to(device))
 		validation_criterion = nn.CrossEntropyLoss().to(device)
 
-	elif MODEL_NAME in ["RESNET_18", "RESNET_50"]:
+	# Negative Log Likelihood
+	elif LOSS_FKT is "NN_LOSS":
 		training_criterion = nn.NLLLoss(weight=torch.from_numpy(numpy.float32(weights)).to(device))
 		validation_criterion = nn.NLLLoss().to(device)
 
@@ -177,10 +211,10 @@ def main():
 			optimizer.step()
 			running_loss += loss.item()
 
-			# Update the losses
-			train_losses.append(running_loss / len(training_loader))
-			train_loss_curve.set_xdata(range(len(train_losses)))
-			train_loss_curve.set_ydata(numpy.array(train_losses))
+		# Update the losses
+		train_losses.append(running_loss / len(training_loader))
+		train_loss_curve.set_xdata(range(len(train_losses)))
+		train_loss_curve.set_ydata(numpy.array(train_losses))
 
 
 		# Validation
@@ -204,8 +238,8 @@ def main():
 
 				# Get the confusion matrix
 				# Transform to CPU
-				ref_labels = numpy.array(labels.view(*top_class.shape).cpu())
-				pred_label = numpy.array(top_class.cpu())
+				ref_labels = labels.view(*top_class.shape).cpu().detach().numpy()
+				pred_label = top_class.cpu().detach().numpy()
 
 				# Get the confusion matrix by a queue
 				# 1,1 = Correctly classified notary documents
@@ -215,7 +249,6 @@ def main():
 
 			t2 = time.time()
 
-
 			# Update the plots
 			validation_losses.append(validation_loss/len(validation_loader))
 			validation_loss_curve.set_xdata(range(len(validation_losses)))
@@ -223,27 +256,26 @@ def main():
 
 			loss_ax.set_xlim((0, len(validation_losses)-1))
 			pyplot.pause(0.05)
+			loss_fig.savefig("%s_%s.png" % (MODEL_NAME, CHOSEN_SET), dpi=200)
 
 			# Print the losses
-			print(f" {t2-t0} - Epoch {epoch+1}/{EPOCHS}.. Train loss: {running_loss / PRINT_EVERY:.3f}.. "
-				f"Test loss: {validation_loss/len(validation_loader):.3f}.. "
-				f"Test accuracy: {accuracy/len(validation_loader):.3f}")
+			__LOGGER__.info(f" {t2-t0} - Epoch {epoch+1}/{EPOCHS}.. Train loss: {running_loss / PRINT_EVERY:.3f}.. "
+						f"Test loss: {validation_loss/len(validation_loader):.3f}.. "
+						f"Test accuracy: {accuracy/len(validation_loader):.3f}")
 
 			# Pretty-print the confusion table
-			print("\n")
-			print("Doc Type   | Correctly classified | Missclassified")
-			print("-" * 50)
-			print("Non-notary | %8i             | %8i" % (confusion[0, 0], confusion[0, 1]))
-			print("Notary     | %8i             | %8i" % (confusion[1, 1], confusion[1, 0]))
+			__LOGGER__.info("\nDoc Type   | Correctly classified | Missclassified\n" + "-" * 50 + "\n" +
+						"Non-notary | %8i             | %8i\n" % (confusion[0, 0], confusion[0, 1]) +
+						"Notary     | %8i             | %8i\n" % (confusion[1, 1], confusion[1, 0]))
 
 		# endregion
 
 		# Save the net after each 5 epoch
 		if epoch % 5 == 4:
-			torch.save(model_network, MODEL_PATH)
+			torch.save(model_network.state_dict(), MODEL_PATH)
 
 	# SAVE Model in the end
-	torch.save(model_network, MODEL_PATH)
+	torch.save(model_network.state_dict(), MODEL_PATH)
 
 
 if __name__ == '__main__':

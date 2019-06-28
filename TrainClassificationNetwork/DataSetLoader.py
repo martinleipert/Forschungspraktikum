@@ -50,10 +50,12 @@ def default_flist_reader(flist):
 			try:
 				stripped_line = line.strip()
 				im_path, im_label = re.search(r"(.*?)\s+(\d)", stripped_line).groups()
+				if os.path.isdir(im_path):
+					pass
 				imlist.append((im_path, int(im_label)))
+
+
 			except Exception as e:
-				pass
-			if os.path.isdir(im_path):
 				pass
 
 	return imlist

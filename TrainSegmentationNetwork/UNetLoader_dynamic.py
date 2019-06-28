@@ -245,9 +245,9 @@ class UNetDatasetDynamicMask(Dataset):
         return len(self.input_images)
 
     def __getitem__(self, idx):
-        image = self.input_images[idx]
+        image_path = self.input_images[idx]
 
-        image, mask = self.data_set_loader(image, region_select=self.region_select)
+        image, mask = self.data_set_loader(image_path, region_select=self.region_select)
 
         if self.transform:
             image = self.transform(image)
@@ -264,7 +264,7 @@ class UNetDatasetDynamicMask(Dataset):
 
         image = trafo(image)
 
-        return [image, mask]
+        return [image, mask, image_path]
 
 
 if __name__ == "__main__":
