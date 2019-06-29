@@ -13,12 +13,14 @@ CLASS_LABELS = {
 }
 
 
-def plot_result(segmented_data_set, model_name, file_names, class_labels=CLASS_LABELS):
-	result_dir = f"{model_name}_results"
-	if not os.path.exists(result_dir):
-		os.mkdir(result_dir)
+def plot_result(segmented_data_set, model_name, file_names, class_labels=CLASS_LABELS, store=True, show=False):
 
-	sum_set = torch.sum(torch.sigmoid(segmented_dataset), 1)
+	if store:
+		result_dir = f"{model_name}_results"
+		if not os.path.exists(result_dir):
+			os.mkdir(result_dir)
+
+	sum_set = torch.sum(torch.sigmoid(segmented_data_set), 1)
 
 	numpy_set = torch.sigmoid(segmented_data_set)
 
@@ -51,4 +53,7 @@ def plot_result(segmented_data_set, model_name, file_names, class_labels=CLASS_L
 			ax.imshow(cls_data, vmin=0, vmax=1)
 			ax.set_title(cls_label)
 
-		fig.savefig(f"Results/{result_dir}/{base_name}_segmentation.png")
+		if show:
+			fig.show()
+		if store:
+			fig.savefig(f"Results/{result_dir}/{base_name}_segmentation.png")

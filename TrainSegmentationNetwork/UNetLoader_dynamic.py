@@ -142,7 +142,6 @@ def dynamic_mask_loader(path, augmentation=None, region_select=False, p_region_s
         randint = random.randint(1, 100)
 
         # TODO: Use different snippet sizes so validation loss gets reduced
-        # TODO: Better augmentation
         if randint < 75:
             elidx = random.randint(0, len(all_els)-1)
             element = all_els[elidx]
@@ -173,7 +172,6 @@ def dynamic_mask_loader(path, augmentation=None, region_select=False, p_region_s
                     tmp_im = tmp_im.crop((xbb, ybb, xbb + wbb, ybb + hbb))
 
                     cropped_mask[:, :, i] = np.array(tmp_im)
-                # TODO CROP such that the regions are inside
 
                 horst = 1
                 mask_array = cropped_mask
@@ -270,5 +268,5 @@ class UNetDatasetDynamicMask(Dataset):
 if __name__ == "__main__":
     file = "/home/martin/Forschungspraktikum/Testdaten/Transkribierte_Notarsurkunden/" \
            "notarskurkunden_mom_restored/0001_ABP_14341123_PfA-Winzer-U-0002-0_r.jpg"
-    trafo_img, trafo_mask = dynamic_mask_loader(file, region_select=True)
+    trafo_img, trafo_mask, im_path = dynamic_mask_loader(file, region_select=True)
     pass

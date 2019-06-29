@@ -55,7 +55,7 @@ VAL_LOSSES_WEIGHTING = {
     "FOCAL_LOSS" : 0.33
 }
 
-__LOG_PATH = f"Training_Log_{MODEL_NAME}_{SET_NAME}.txt"
+__LOG_PATH = f"TrainingLogs/Training_Log_{MODEL_NAME}_{SET_NAME}.txt"
 formatter = logging.Formatter('%(asctime)s\n%(message)s')
 
 file_handler = logging.FileHandler(__LOG_PATH)
@@ -128,19 +128,19 @@ def main():
         # Start the training phase of an epoch
         epoch_start = time.time()
 
-        print(f'\n{epoch_start - start_time} s elapsed\nEpoch {epoch + 1 }/{NUM_EPOCHS}')
-        print('-' * 10)
+        __LOGGER__.info(f'\n{epoch_start - start_time} s elapsed\nEpoch {epoch + 1 }/{NUM_EPOCHS}')
+        __LOGGER__.info('-' * 10)
 
         exp_lr_scheduler.step()
 
-        # Trainingphase
+        # Training phase
         model.train()
         epoch_samples = 0
         metrics = defaultdict(float)
 
         __LOGGER__.info("===== Training =====")
-        # Imagewise Training
-        with torch.set_grad_enabled(True):
+        # Image-wise Training
+        with torch.no_grad():
 
             for images, masks, image_paths in train_loader:
 
@@ -154,15 +154,6 @@ def main():
                 # track history if only in train
                 outputs = model.forward(images)
 
-                # sum_set = np.sum(torch.sigmoid(outputs).cpu().detach().numpy(), axis=1)
-                # numpy_set = torch.sigmoid(outputs).cpu().detach().numpy()
-                # for i in range(sum_set.shape[0]):
-                #     numpy_set[i, :, :, :] = np.divide(numpy_set[i, :, :, :], sum_set[i, :, :])
-                # pyplot.imshow(numpy_set[0, 0, :, :], vmin=0, vmax=1)
-
-
-                # TODO BCE seems to be broken ?
-                # F.binary_cross_entropy_with_logits(outputs.float(), masks.float())
                 loss = calc_loss(outputs, masks, metrics, TRAIN_LOSSES_WEIGHTING)
 
                 # backward + optimize only if in training phase
@@ -184,7 +175,7 @@ def main():
         metrics = defaultdict(float)
         epoch_samples = 0
         __LOGGER__.info("===== Validation =====")
-        with torch.set_grad_enabled(False):
+        with torch.no_grad():
             for images, masks, image_paths in validation_loader:
                 images = images.to(device)
                 masks = masks.to(device)
@@ -208,21 +199,18 @@ def main():
         validation_loss_curve.set_ydata(np.array(validation_losses))
         loss_ax.set_xlim((0, len(validation_losses) - 1))
         pyplot.pause(0.05)
-        loss_fig.savefig("%s_%s.png" % (MODEL_NAME, SET_NAME), dpi=200)
+        loss_fig.savefig("TrainingLogs/%s_%s.png" % (MODEL_NAME, SET_NAME), dpi=200)
 
         if epoch % 5 == 4 and SAVE_MODEL:
-            torch.save_state_dict(model.state_dict(), "TrainedModels/%s" % MODEL_NAME)
+            torch.save(model.state_dict(), "TrainedModels/%s" % MODEL_NAME)
 
-    end_time = time.time()
-    torch.save_state_dict(model.state_dict(), "TrainedModels/%s" % MODEL_NAME)
+    torch.save(model.state_dict(), "TrainedModels/%s" % MODEL_NAME)
 
     pass
 
 
-# TODO functions and weightings in a dictionary
 def calc_loss(pred, target, metrics, losses_weighting):
 
-    # Fix -> TODO find out why necessary and remove
     target = target.double()
     pred = torch.sigmoid(pred.double())
 

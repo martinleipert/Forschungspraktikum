@@ -51,7 +51,7 @@ LOSS_FKT = "NN_LOSS"
 """
 Setup the logger
 """
-__LOG_PATH = f"Training_Log_{MODEL_NAME}_{CHOSEN_SET}.txt"
+__LOG_PATH = f"TrainingLogs/Training_Log_{MODEL_NAME}_{CHOSEN_SET}.txt"
 formatter = logging.Formatter('%(asctime)s\n%(message)s')
 
 file_handler = logging.FileHandler(__LOG_PATH)
@@ -69,11 +69,10 @@ __LOGGER__.addHandler(cmd_handler)
 def main():
 
 	pyplot.ion()
-	t0 = time.time()
 
 	__LOGGER__.info(f"Start Training of {MODEL_NAME}\n"
 					f"Training on {CHOSEN_SET}\n"
-					"Learning Rate: {LEARNING_RATE}\n"
+					f"Learning Rate: {LEARNING_RATE}\n"
 					f"Batch size: {BATCH_SIZE}\n"
 					f"Epochs: {EPOCHS}\n"
 					f"Learning Rate Step Size: {LR_STEP_SIZE}\n"
@@ -154,7 +153,6 @@ def main():
 		training_criterion = nn.NLLLoss(weight=torch.from_numpy(numpy.float32(weights)).to(device))
 		validation_criterion = nn.NLLLoss().to(device)
 
-
 	# Optimzer
 	lr = LEARNING_RATE
 	optimizer = optim.Adam(model_network.parameters(), lr=lr)
@@ -185,9 +183,8 @@ def main():
 	# Store losses
 	train_losses, validation_losses = [], []
 
-	t1 = time.time()
-
-	print(
+	t0 = time.time()
+	__LOGGER__.info(
 		"##########################\n"
 		"#    Start Training      #\n"
 		"##########################\n"
@@ -195,12 +192,13 @@ def main():
 
 	for epoch in range(EPOCHS):
 
+		t1 = time.time()
 		exp_lr_scheduler.step()
 
 		model_network.train()
 		running_loss = 0
 		# Training
-		for inputs, labels in training_loader:
+		for inputs, labels, image_paths in training_loader:
 			steps += 1
 			inputs, labels = inputs.to(device), labels.to(device)
 
@@ -216,7 +214,6 @@ def main():
 		train_loss_curve.set_xdata(range(len(train_losses)))
 		train_loss_curve.set_ydata(numpy.array(train_losses))
 
-
 		# Validation
 		confusion = numpy.zeros([2, 2])
 
@@ -224,7 +221,7 @@ def main():
 		accuracy = 0
 		model_network.eval()
 		with torch.no_grad():
-			for inputs, labels in validation_loader:
+			for inputs, labels, image_paths in validation_loader:
 				inputs, labels = inputs.to(device), labels.to(device)
 				logps = model_network.forward(inputs)
 				batch_loss = validation_criterion(logps, labels)
@@ -256,10 +253,10 @@ def main():
 
 			loss_ax.set_xlim((0, len(validation_losses)-1))
 			pyplot.pause(0.05)
-			loss_fig.savefig("%s_%s.png" % (MODEL_NAME, CHOSEN_SET), dpi=200)
+			loss_fig.savefig("TrainingLogs/%s_%s.png" % (MODEL_NAME, CHOSEN_SET), dpi=200)
 
 			# Print the losses
-			__LOGGER__.info(f" {t2-t0} - Epoch {epoch+1}/{EPOCHS}.. Train loss: {running_loss / PRINT_EVERY:.3f}.. "
+			__LOGGER__.info(f" {t2-t0}s total - {t2-t1}s epoch - Epoch {epoch+1}/{EPOCHS}.. Train loss: {running_loss / PRINT_EVERY:.3f}.. "
 						f"Test loss: {validation_loss/len(validation_loader):.3f}.. "
 						f"Test accuracy: {accuracy/len(validation_loader):.3f}")
 
@@ -267,8 +264,6 @@ def main():
 			__LOGGER__.info("\nDoc Type   | Correctly classified | Missclassified\n" + "-" * 50 + "\n" +
 						"Non-notary | %8i             | %8i\n" % (confusion[0, 0], confusion[0, 1]) +
 						"Notary     | %8i             | %8i\n" % (confusion[1, 1], confusion[1, 0]))
-
-		# endregion
 
 		# Save the net after each 5 epoch
 		if epoch % 5 == 4:

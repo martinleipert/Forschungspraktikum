@@ -54,7 +54,6 @@ def default_flist_reader(flist):
 					pass
 				imlist.append((im_path, int(im_label)))
 
-
 			except Exception as e:
 				pass
 
@@ -64,9 +63,9 @@ def default_flist_reader(flist):
 class ImageFilelist(data.Dataset):
 
 	def __init__(self, root, flist, transform=None, target_transform=None, augmentation=weak_augmentation(),
-	             flist_reader=default_flist_reader, loader=augmentation_loader, enrich_factor=1):
+				 flist_reader=default_flist_reader, loader=augmentation_loader, enrich_factor=1):
 		self.enrich_factor = enrich_factor
-		self.root   = root
+		self.root = root
 		self.imlist = flist_reader(flist)
 		self.org_list = self.imlist
 		if enrich_factor <= 1:
@@ -86,7 +85,7 @@ class ImageFilelist(data.Dataset):
 		if self.target_transform is not None:
 			target = self.target_transform(target)
 
-		return img, target
+		return img, target, impath
 
 	def __len__(self):
 		return len(self.imlist)

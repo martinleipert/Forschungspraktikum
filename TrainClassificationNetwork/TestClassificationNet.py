@@ -8,6 +8,11 @@ from TrainClassificationNetwork.DataSetLoader import ImageFilelist
 Martin Leipert
 martin.leipert@fau.de
 
+Test script for the trained classification network
+
+Tests sensitivity and specifity 
+Denotes the results as txt
+Denote missclassifications
 """
 
 SET_NAME = "equalized_set"
@@ -66,7 +71,7 @@ def main():
 	confusion = np.zeros((2, 2))
 
 	# Training
-	for images, labels in test_loader:
+	for images, labels, image_paths in test_loader:
 		model_network.eval()
 		images = images.to(device)
 		labels = labels.to(device)
@@ -114,8 +119,8 @@ def denote_result(base_name, loss_sum, ce_loss, nn_loss, confusion):
 
 		# Pretty-print the confusion table
 		open_file.write("Doc Type   | Correctly classified | Missclassified\n" + "-" * 50 + "\n" +
-		                "Non-notary | %8i             | %8i\n" % (confusion[0, 0], confusion[0, 1]) +
-		                "Notary     | %8i             | %8i\n" % (confusion[1, 1], confusion[1, 0]))
+						"Non-notary | %8i             | %8i\n" % (confusion[0, 0], confusion[0, 1]) +
+						"Notary     | %8i             | %8i\n" % (confusion[1, 1], confusion[1, 0]))
 
 
 if __name__ == '__main__':
