@@ -3,6 +3,7 @@ from torch import nn
 from torchvision import models
 import numpy as np
 from TrainClassificationNetwork.DataSetLoader import ImageFilelist
+import os
 
 """
 Martin Leipert
@@ -70,8 +71,11 @@ def main():
 	accuracy = 0
 	confusion = np.zeros((2, 2))
 
+	for_label_result_printing = []
+
 	# Training
 	for images, labels, image_paths in test_loader:
+
 		model_network.eval()
 		images = images.to(device)
 		labels = labels.to(device)
@@ -92,6 +96,11 @@ def main():
 		ref_labels = np.array(labels.view(*top_class.shape).cpu())
 		pred_label = np.array(top_class.cpu())
 
+		for index, im_path in enumerate(image_paths):
+			im_base_name = os.path.basename(im_path)
+			to_print = (im_base_name, label_to_str(ref_labels[index]), label_to_str(pred_label[index]))
+			for_label_result_printing.append(to_print)
+
 		# Get the confusion matrix by a queue
 		# 1,1 = Correctly classified notary documents
 		for i in range(NUM_CLASSES):
@@ -109,7 +118,7 @@ def main():
 	denote_result(base_name, loss_sum_nn, loss_sum_ce, loss_sum_nn, confusion)
 
 
-def denote_result(base_name, loss_sum, ce_loss, nn_loss, confusion):
+def denote_result(base_name, loss_sum, ce_loss, nn_loss, confusion, for_label_result_printing):
 
 	with open(f"Results/{base_name}_test_result.txt", "w+") as open_file:
 		open_file.write(f"Loss on Test_data: {loss_sum}\n")
@@ -121,6 +130,17 @@ def denote_result(base_name, loss_sum, ce_loss, nn_loss, confusion):
 		open_file.write("Doc Type   | Correctly classified | Missclassified\n" + "-" * 50 + "\n" +
 						"Non-notary | %8i             | %8i\n" % (confusion[0, 0], confusion[0, 1]) +
 						"Notary     | %8i             | %8i\n" % (confusion[1, 1], confusion[1, 0]))
+
+		open_file.write("\n\n")
+		open_file.write("%s | %s | %s\n" %
+						("Filename".rjust(45), "Reference Label".rjust(20), "Prediction Label".rjust(20)))
+		for im_base_name, ref_label, pred_label in for_label_result_printing:
+			open_file.write("%s | %s | %s\n" %
+							(im_base_name.rjust(45), ref_label.rjust(20), pred_label.rjust(20)))
+
+
+def label_to_str(label):
+	return "NOTARY" if label == 1 else "NON NOTARY"
 
 
 if __name__ == '__main__':
