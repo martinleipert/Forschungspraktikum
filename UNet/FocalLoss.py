@@ -19,7 +19,7 @@ from torch.autograd import Variable
 
 class FocalLoss2d(nn.Module):
 
-	def __init__(self, gamma=0, weight=None, size_average=True):
+	def __init__(self, gamma=2, weight=None, size_average=True):
 		super(FocalLoss2d, self).__init__()
 
 		self.gamma = gamma
@@ -47,7 +47,6 @@ class FocalLoss2d(nn.Module):
 		ones = torch.ones_like(input)
 		pt_c = ones - target
 
-		weight = Variable(self.weight)
 		pt = ones + target*p - pt_c*p
 
 		logpt = torch.log(pt)
@@ -57,6 +56,17 @@ class FocalLoss2d(nn.Module):
 
 		loss[torch.isnan(loss)] = 0
 		loss[torch.isinf(loss)] = 0
+
+
+		# Is implemented for four classes
+		if self.weight:
+			weight = Variable(self.weight)
+			# Weight the samples accordingly
+			tensor_weights = torch.zeros_like(loss)
+
+			for i in range(4):
+				tensor_weights = tensor_weights + torch.where(target[:, i, :, :] == 1, weight[i], tensor_weights)
+			loss = tensor_weights * loss
 
 		# averaging (or not) loss
 		if self.size_average:

@@ -140,28 +140,26 @@ def main():
 
         __LOGGER__.info("===== Training =====")
         # Image-wise Training
-        with torch.no_grad():
+        for images, masks, image_paths in train_loader:
 
-            for images, masks, image_paths in train_loader:
+            images = images.to(device)
+            masks = masks.to(device)
 
-                images = images.to(device)
-                masks = masks.to(device)
+            # Set Gradients to zero
+            optimizer.zero_grad()
 
-                # Set Gradients to zero
-                optimizer.zero_grad()
+            # forward
+            # track history if only in train
+            outputs = model.forward(images)
 
-                # forward
-                # track history if only in train
-                outputs = model.forward(images)
+            loss = calc_loss(outputs, masks, metrics, TRAIN_LOSSES_WEIGHTING)
 
-                loss = calc_loss(outputs, masks, metrics, TRAIN_LOSSES_WEIGHTING)
+            # backward + optimize only if in training phase
+            loss.backward()
+            optimizer.step()
 
-                # backward + optimize only if in training phase
-                loss.backward()
-                optimizer.step()
-
-                # statistics
-                epoch_samples += images.size(0)
+            # statistics
+            epoch_samples += images.size(0)
 
         print_metrics(metrics, epoch_samples, 'train')
 
@@ -197,7 +195,7 @@ def main():
         validation_losses.append(val_loss)
         validation_loss_curve.set_xdata(range(len(validation_losses)))
         validation_loss_curve.set_ydata(np.array(validation_losses))
-        loss_ax.set_xlim((0, len(validation_losses) - 1))
+        loss_ax.set_xlim((-1, len(validation_losses)))
         pyplot.pause(0.05)
         loss_fig.savefig("TrainingLogs/%s_%s.png" % (MODEL_NAME, SET_NAME), dpi=200)
 
@@ -223,7 +221,7 @@ def calc_loss(pred, target, metrics, losses_weighting):
     focal_loss, bce_loss, dice = (0, 0, 0)
 
     if focal_weight > 0:
-        focal_loss = FocalLoss2d().forward(pred, target)
+        focal_loss = FocalLoss2d(gamma=2).forward(pred, target)
         metrics['focal'] += focal_loss.data.cpu().numpy() * target.size(0)
 
     if dice_weight > 0:
