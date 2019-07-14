@@ -10,20 +10,26 @@ import os.path
 import re
 import random
 from Augmentations.Augmentations import *
+from TrainClassificationNetwork.SwapAddNotarySymbol import SymbolSwapper
 
 Image.LOAD_TRUNCATED_IMAGES = True
 
 
-def augmentation_loader(path, augmentation=None):
-	image = Image.open(path)
+def augmentation_loader(path, label, augmentation=None, swapper=None):
 
-	for i in range(3):
-		try:
-			image.load()
-		except Exception as e:
-			pass
+	if swapper and label == 1 and random.randint(1, 10) > 1:
+		image = swapper.load_and_swap_symbol(path)
 
-	image = image.convert('RGB')
+	else:
+		image = Image.open(path)
+
+		for i in range(3):
+			try:
+				image.load()
+			except Exception as e:
+				pass
+
+		image = image.convert('RGB')
 
 	if augmentation:
 		try:
@@ -63,7 +69,8 @@ def default_flist_reader(flist):
 class ImageFilelist(data.Dataset):
 
 	def __init__(self, root, flist, transform=None, target_transform=None, augmentation=weak_augmentation(),
-				 flist_reader=default_flist_reader, loader=augmentation_loader, enrich_factor=1):
+				 flist_reader=default_flist_reader, loader=augmentation_loader, enrich_factor=1, swap=False,
+				 swap_probability=0.9):
 		self.enrich_factor = enrich_factor
 		self.root = root
 		self.imlist = flist_reader(flist)
@@ -77,9 +84,14 @@ class ImageFilelist(data.Dataset):
 		self.loader = loader
 		self.augmentation = augmentation
 
+		self.swap_probability = 0.9
+		self.swapper = None
+		if swap is True:
+			self.swapper = SymbolSwapper(self.org_list)
+
 	def __getitem__(self, index):
 		impath, target = self.imlist[index]
-		img = self.loader(os.path.join(self.root, impath), augmentation=self.augmentation)
+		img = self.loader(os.path.join(self.root, impath), target, augmentation=self.augmentation, swapper=self.swapper)
 		if self.transform is not None:
 			img = self.transform(img)
 		if self.target_transform is not None:

@@ -2,7 +2,7 @@ import torchvision.models as models
 from DataSetLoader import ImageFilelist
 import torch
 from Augmentations.Augmentations import weak_augmentation, moderate_augmentation, heavy_augmentation
-
+from TrainClassificationNetwork.FocalLossClassification import FocalLoss
 
 from torch import nn
 from torch import optim
@@ -18,7 +18,7 @@ import logging
 
 # TODO implement logging -> loss and recognition
 # region Parameters
-CHOSEN_SET = "equalized_set"
+CHOSEN_SET = "full_set"
 
 TRAINING_SET = f"/home/martin/Forschungspraktikum/Testdaten/Sets/{CHOSEN_SET}/traindata.txt"
 VALIDATION_SET = f"/home/martin/Forschungspraktikum/Testdaten/Sets/{CHOSEN_SET}/validationdata.txt"
@@ -30,7 +30,7 @@ NUM_CLASSES = 2
 
 # Parametrization for the training
 EPOCHS = 30
-PRINT_EVERY = 25
+PRINT_EVERY_ITERATIONS = 25
 # Step size of Learning rate decay
 LR_STEP_SIZE = 10
 # endregion
@@ -82,7 +82,7 @@ def main():
 	Prepare the data
 	"""
 	# Load with self written FIle loader
-	training_data = ImageFilelist('.', TRAINING_SET, enrich_factor=1, augmentation=moderate_augmentation)
+	training_data = ImageFilelist('.', TRAINING_SET, enrich_factor=1, augmentation=moderate_augmentation, swap=True)
 	validation_data = ImageFilelist('.', VALIDATION_SET)
 
 	# Define the DataLoader
@@ -153,6 +153,10 @@ def main():
 		training_criterion = nn.NLLLoss(weight=torch.from_numpy(numpy.float32(weights)).to(device))
 		validation_criterion = nn.NLLLoss().to(device)
 
+	elif LOSS_FKT is "FOCAL_LOSS":
+		training_criterion = FocalLoss().to(device)
+		validation_criterion = FocalLoss().to(device)
+
 	# Optimzer
 	lr = LEARNING_RATE
 	optimizer = optim.Adam(model_network.parameters(), lr=lr)
@@ -190,16 +194,18 @@ def main():
 		"##########################\n"
 	)
 
+	# Itzerationcounter
+	iteration_count = 0
+	running_loss = 0
+	model_network.train()
+	t1 = time.time()
+
 	for epoch in range(EPOCHS):
 
-		t1 = time.time()
-		exp_lr_scheduler.step()
-
-		model_network.train()
-		running_loss = 0
 		# Training
 		for inputs, labels, image_paths in training_loader:
-			steps += 1
+			iteration_count += 1
+
 			inputs, labels = inputs.to(device), labels.to(device)
 
 			optimizer.zero_grad()
@@ -207,63 +213,74 @@ def main():
 			loss = training_criterion(logps, labels)
 			loss.backward()
 			optimizer.step()
-			running_loss += loss.item()
 
-		# Update the losses
-		train_losses.append(running_loss / len(training_loader))
-		train_loss_curve.set_xdata(range(len(train_losses)))
-		train_loss_curve.set_ydata(numpy.array(train_losses))
+			running_loss += loss.detach().item()
 
-		# Validation
-		confusion = numpy.zeros([2, 2])
+			# Update the losses
+			train_losses.append(running_loss / len(training_loader))
+			train_loss_curve.set_xdata(range(len(train_losses)))
+			train_loss_curve.set_ydata(numpy.array(train_losses))
 
-		validation_loss = 0
-		accuracy = 0
-		model_network.eval()
-		with torch.no_grad():
-			for inputs, labels, image_paths in validation_loader:
-				inputs, labels = inputs.to(device), labels.to(device)
-				logps = model_network.forward(inputs)
-				batch_loss = validation_criterion(logps, labels)
-				validation_loss += batch_loss.item()
+			if iteration_count % PRINT_EVERY_ITERATIONS == 0:
+				del inputs, labels, image_paths
 
-				# ps -> sample predictions
-				ps = torch.exp(logps)
-				top_p, top_class = ps.topk(1, dim=1)
-				equals = top_class == labels.view(*top_class.shape)
-				accuracy += torch.mean(equals.type(torch.FloatTensor)).item()
+				# Validation
+				confusion = numpy.zeros([2, 2])
 
-				# Get the confusion matrix
-				# Transform to CPU
-				ref_labels = labels.view(*top_class.shape).cpu().detach().numpy()
-				pred_label = top_class.cpu().detach().numpy()
+				validation_loss = 0
+				accuracy = 0
+				model_network.eval()
+				with torch.no_grad():
+					for inputs, labels, image_paths in validation_loader:
+						inputs, labels = inputs.to(device), labels.to(device)
+						logps = model_network.forward(inputs)
+						batch_loss = validation_criterion(logps, labels)
+						validation_loss += batch_loss.item()
 
-				# Get the confusion matrix by a queue
-				# 1,1 = Correctly classified notary documents
-				for i in range(NUM_CLASSES):
-					for j in range(NUM_CLASSES):
-						confusion[i, j] += numpy.sum(numpy.logical_and(ref_labels == i, pred_label == j))
+						# ps -> sample predictions
+						ps = torch.exp(logps)
+						top_p, top_class = ps.topk(1, dim=1)
+						equals = top_class == labels.view(*top_class.shape)
+						accuracy += torch.mean(equals.type(torch.FloatTensor)).item()
 
-			t2 = time.time()
+						# Get the confusion matrix
+						# Transform to CPU
+						ref_labels = labels.view(*top_class.shape).cpu().detach().numpy()
+						pred_label = top_class.cpu().detach().numpy()
 
-			# Update the plots
-			validation_losses.append(validation_loss/len(validation_loader))
-			validation_loss_curve.set_xdata(range(len(validation_losses)))
-			validation_loss_curve.set_ydata(numpy.array(validation_losses))
+						# Get the confusion matrix by a queue
+						# 1,1 = Correctly classified notary documents
+						for i in range(NUM_CLASSES):
+							for j in range(NUM_CLASSES):
+								confusion[i, j] += numpy.sum(numpy.logical_and(ref_labels == i, pred_label == j))
 
-			loss_ax.set_xlim((0, len(validation_losses)-1))
-			pyplot.pause(0.05)
-			loss_fig.savefig("TrainingLogs/%s_%s.png" % (MODEL_NAME, CHOSEN_SET), dpi=200)
+					t2 = time.time()
 
-			# Print the losses
-			__LOGGER__.info(f" {t2-t0}s total - {t2-t1}s epoch - Epoch {epoch+1}/{EPOCHS}.. Train loss: {running_loss / PRINT_EVERY:.3f}.. "
-						f"Test loss: {validation_loss/len(validation_loader):.3f}.. "
-						f"Test accuracy: {accuracy/len(validation_loader):.3f}")
+					# Update the plots
+					validation_losses.append(validation_loss / len(validation_loader))
+					validation_loss_curve.set_xdata(range(len(validation_losses)))
+					validation_loss_curve.set_ydata(numpy.array(validation_losses))
 
-			# Pretty-print the confusion table
-			__LOGGER__.info("\nDoc Type   | Correctly classified | Missclassified\n" + "-" * 50 + "\n" +
-						"Non-notary | %8i             | %8i\n" % (confusion[0, 0], confusion[0, 1]) +
-						"Notary     | %8i             | %8i\n" % (confusion[1, 1], confusion[1, 0]))
+					loss_ax.set_xlim((0, len(validation_losses) - 1))
+					pyplot.pause(0.05)
+					loss_fig.savefig("TrainingLogs/%s_%s.png" % (MODEL_NAME, CHOSEN_SET), dpi=200)
+
+					# Print the losses
+					__LOGGER__.info(
+						f" {t2 - t0}s total - {t2 - t1}s epoch - Epoch {epoch + 1}/{EPOCHS}.. Train loss: {running_loss / PRINT_EVERY_ITERATIONS:.3f}.. "
+						f"Test loss: {validation_loss / len(validation_loader):.3f}.. "
+						f"Test accuracy: {accuracy / len(validation_loader):.3f}")
+
+					# Pretty-print the confusion table
+					__LOGGER__.info("\nDoc Type   | Correctly classified | Missclassified\n" + "-" * 50 + "\n" +
+					                "Non-notary | %8i             | %8i\n" % (confusion[0, 0], confusion[0, 1]) +
+					                "Notary     | %8i             | %8i\n" % (confusion[1, 1], confusion[1, 0]))
+
+				t1 = time.time()
+				exp_lr_scheduler.step()
+
+				model_network.train()
+				running_loss = 0
 
 		# Save the net after each 5 epoch
 		if epoch % 5 == 4:

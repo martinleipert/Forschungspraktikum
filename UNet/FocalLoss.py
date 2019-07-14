@@ -24,6 +24,7 @@ class FocalLoss2d(nn.Module):
 
 		self.gamma = gamma
 		self.weight = weight
+
 		self.size_average = size_average
 
 	def forward(self, input, target):
@@ -60,7 +61,7 @@ class FocalLoss2d(nn.Module):
 
 		# Is implemented for four classes
 		if self.weight:
-			weight = Variable(self.weight)
+			weight = Variable(self.weight).to('gpu')
 			# Weight the samples accordingly
 			tensor_weights = torch.zeros_like(loss)
 

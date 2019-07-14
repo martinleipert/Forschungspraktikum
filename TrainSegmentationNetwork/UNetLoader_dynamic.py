@@ -1,5 +1,5 @@
 from torch.utils.data import Dataset, DataLoader
-from torchvision import transforms, datasets, models
+import torchvision.transforms as TF
 from PIL import Image, ImageDraw, ImageFile
 import numpy as np
 import os
@@ -8,6 +8,7 @@ from xml.etree import ElementTree as ET
 import random
 import cv2
 from torch import tensor
+from Augmentations.Augmentations import weak_augmentation
 
 from albumentations import (
     HorizontalFlip, IAAPerspective, ShiftScaleRotate, CLAHE, RandomRotate90,
@@ -44,6 +45,7 @@ REGION_TYPES = {
     "GraphicRegion": 3
 }
 
+
 # Helper Method for bounding box extraction
 def extract_bounding_box(pt_arr):
 
@@ -54,36 +56,6 @@ def extract_bounding_box(pt_arr):
     bb_coordinates = [(x_min, y_min), (x_max, y_min), (x_max, y_max), (x_min, y_max)]
     bb_parameters = (x_min, y_min, x_max - x_min, y_max - y_min)
     return bb_parameters
-
-
-def strong_aug(p=0.9):
-    return Compose([
-        ShiftScaleRotate(shift_limit=0.15, scale_limit=0.1, rotate_limit=10, p=0.3),
-        OpticalDistortion(p=0.5),
-        GridDistortion(p=0.5),
-        IAAPiecewiseAffine(p=0.6),
-        RandomBrightnessContrast(brightness_limit=0.3, contrast_limit=0.3),
-        HueSaturationValue(p=0.4),
-        Blur(blur_limit=11, p=0.75),
-        ElasticTransform()
-    ], p=p)
-
-
-def simple_augmentation(img, mask):
-    trafo1 = strong_aug(p=0.9)
-
-    img = np.array(img.cpu())
-    mask = np.array(mask.cpu(), dtype=np.uint8)
-    try:
-        transformed = trafo1(image=img, mask=mask)
-        img = transformed['image']
-        mask = transformed['mask']
-        return img, mask
-    # TODO more elegant -> I don't know why I need to do this fix
-    except Exception as e:
-        pass
-    # TODO : Why img is binary?
-    return img, mask
 
 
 """
@@ -136,6 +108,7 @@ def dynamic_mask_loader(path, augmentation=None, region_select=False, p_region_s
 
     # Mask out the background
     mask_array[:, :, 0] = np.where(mask_array[:, :, 0] == 0, 1, 0)
+    mask_array = np.uint8(mask_array)
 
     # If a random region get's masked out
     if region_select:
@@ -178,34 +151,23 @@ def dynamic_mask_loader(path, augmentation=None, region_select=False, p_region_s
                 pass
 
     # Augmentation-independent Transformation -> TO Tensor
-    trans3 = transforms.ToTensor()
+    trans3 = TF.ToTensor()
+
 
     if augmentation is None:
-        trans1 = transforms.Resize(256)
-        trans2 = transforms.CenterCrop(224)
+        trans1 = TF.Resize(256)
+        trans2 = TF.CenterCrop(224)
 
         trafo_img = trans3(trans2(trans1(image)))
-
+        trafo_mask = np.array([np.array(trans3(trans2(trans1(Image.fromarray(mask_array[:, :, i]))))) for i in range(np.shape(mask_array)[2])])
     else:
-        trafo_img = augmentation(trafo_img)
+
+        transformed = augmentation(image=np.array(image), mask=mask_array)
+
+        trafo_img = trans3(transformed['image'])
+        trafo_mask = trans3(transformed['mask'])
+
         pass
-
-    mask_list = list()
-    for i in range(mask_array.shape[2]):
-        tmp_im_array = Image.fromarray(mask_array[:, :, i])
-        if augmentation is None:
-            mask_list.append(trans2(trans1(tmp_im_array)))
-        else:
-            mask_list.append(augmentation(tmp_im_array))
-
-    mask_list = [np.asarray(im) for im in mask_list]
-
-    trafo_mask = np.zeros(list(trafo_img.size()[1:3]) + [mask_array.shape[2]])
-
-    for i in range(trafo_mask.shape[2]):
-        trafo_mask[:, :, i] = mask_list[i]
-
-    trafo_mask = trans3(trafo_mask)
 
     # print("%s, %s, %s, %s" % (path, str(image.size), image.mode, str(trafo_mask.shape)))
 
@@ -219,11 +181,11 @@ A Dataset containing data from a list which is built of tuples:
 
 class UNetDatasetDynamicMask(Dataset):
     def __init__(self, file_path, transform=None, data_set_loader=dynamic_mask_loader, augment=True,
-                 region_select=False, augmentation=simple_augmentation):
+                 region_select=False, augmentation=weak_augmentation):
         self.input_images = []
         self.data_set_loader = data_set_loader
         self.augment = augment
-        self.augmentation = augmentation
+        self.augmentation = augmentation()
         self.region_select = region_select
 
         with open(file_path) as open_file:
@@ -266,7 +228,12 @@ class UNetDatasetDynamicMask(Dataset):
 
 
 if __name__ == "__main__":
+    from Augmentations.Augmentations import moderate_augmentation
+    from matplotlib import pyplot
+
     file = "/home/martin/Forschungspraktikum/Testdaten/Transkribierte_Notarsurkunden/" \
            "notarskurkunden_mom_restored/0001_ABP_14341123_PfA-Winzer-U-0002-0_r.jpg"
-    trafo_img, trafo_mask, im_path = dynamic_mask_loader(file, region_select=True)
+    trafo_img, trafo_mask = dynamic_mask_loader(file, region_select=False, augmentation=moderate_augmentation())
+    pyplot.imshow(trafo_img.numpy()[0, :, :])
+    pyplot.imshow(trafo_mask.numpy()[0, :, :])
     pass

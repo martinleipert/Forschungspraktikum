@@ -13,7 +13,7 @@ SET_NAME = "mini_set"
 
 FILE_LIST_TEST = "/home/martin/Forschungspraktikum/Testdaten/Segmentation_Sets/%s/test.txt" % SET_NAME
 
-MODEL_NAME = "unet_mini_training.pth"
+MODEL_NAME = "unet_mini_set_training.pth"
 
 BATCH_SIZE = 5
 
@@ -39,8 +39,13 @@ def main():
 
 	base_name = MODEL_NAME.rstrip(".pth")
 
+	metrics = {'focal': 0, 'dice': 0, 'bce': 0, 'loss': 0}
+
+	model_network.eval()
+	torch.no_grad()
+
 	loss_sum = 0
-	# Training
+	# Testings
 	for images, masks, image_paths in test_loader:
 		images = images.to(device)
 		masks = masks.to(device)
@@ -49,13 +54,12 @@ def main():
 		# track history if only in train
 		outputs = model_network(images)
 
-		metrics = {}
-		loss = calc_loss(outputs, masks, metrics, TEST_LOSSES_WEIGHTING)
+		loss = calc_loss(outputs.detach(), masks, metrics, TEST_LOSSES_WEIGHTING)
 
 		# Update the losses
 		loss_sum += loss / len(images)
 
-		plot_result(images, base_name, image_paths)
+		plot_result(outputs, images, base_name, image_paths)
 
 	print(f"Overall loss {loss_sum}")
 	denote_result(base_name, loss_sum)

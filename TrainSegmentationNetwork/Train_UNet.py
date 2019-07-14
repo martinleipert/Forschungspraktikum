@@ -39,9 +39,15 @@ LR_STEP_SIZE = 15
 # FOCAL or BCE_DICE
 UNET_LOSSFKT = "FOCAL"
 LOAD_MODEL = False
-SAVE_MODEL = False
-MODEL_NAME = "unet_full_training.pth"
+SAVE_MODEL = True
+MODEL_NAME = "unet_mini_set_training.pth"
 
+WEIGHTS = [
+    0.4124711540461253,
+    0.8165794359287605,
+    6.900447952756638,
+    4.853207270061199
+]
 
 TRAIN_LOSSES_WEIGHTING = {
     "BCE_LOSS" : 0,
@@ -184,7 +190,7 @@ def main():
                 # track history if only in train
                 outputs = model(images)
 
-                loss = calc_loss(outputs, masks, metrics, VAL_LOSSES_WEIGHTING)
+                loss = calc_loss(outputs, masks, metrics, VAL_LOSSES_WEIGHTING).detach()
 
                 # statistics
                 epoch_samples += images.size(0)
@@ -221,20 +227,20 @@ def calc_loss(pred, target, metrics, losses_weighting):
     focal_loss, bce_loss, dice = (0, 0, 0)
 
     if focal_weight > 0:
-        focal_loss = FocalLoss2d(gamma=2).forward(pred, target)
-        metrics['focal'] += focal_loss.data.cpu().numpy() * target.size(0)
+        focal_loss = FocalLoss2d(gamma=2, weight=WEIGHTS).forward(pred, target)
+        metrics['focal'] += focal_loss.data.cpu().detach().numpy() * target.size(0)
 
     if dice_weight > 0:
         dice = dice_loss(pred, target)
-        metrics['dice'] += dice.data.cpu().numpy() * target.size(0)
+        metrics['dice'] += dice.data.cpu().detach().numpy() * target.size(0)
 
     if bce_weight > 0:
         bce_loss = F.binary_cross_entropy_with_logits(pred, target)
-        metrics['bce'] += bce_loss.data.cpu().numpy() * target.size(0)
+        metrics['bce'] += bce_loss.data.cpu().detach().numpy() * target.size(0)
 
     sum_loss = (bce_loss * bce_weight + dice * dice_weight + focal_loss * focal_weight) / total_weight
 
-    metrics['loss'] += sum_loss.data.cpu().numpy() * target.size(0)
+    metrics['loss'] += sum_loss.data.cpu().detach().numpy() * target.size(0)
 
     return sum_loss
 
