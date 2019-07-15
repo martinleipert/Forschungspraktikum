@@ -66,7 +66,7 @@ def default_flist_reader(flist):
 	return imlist
 
 
-class ImageFilelist(data.Dataset):
+class ImageFileList(data.Dataset):
 
 	def __init__(self, root, flist, transform=None, target_transform=None, augmentation=weak_augmentation(),
 				 flist_reader=default_flist_reader, loader=augmentation_loader, enrich_factor=1, swap=False,
@@ -78,7 +78,7 @@ class ImageFilelist(data.Dataset):
 		if enrich_factor <= 1:
 			self.imlist = self.imlist
 		else:
-			self.imlist = ImageFilelist.augment_imlist(self.imlist, enrich_factor)
+			self.imlist = ImageFileList.augment_imlist(self.imlist, enrich_factor)
 		self.transform = transform
 		self.target_transform = target_transform
 		self.loader = loader

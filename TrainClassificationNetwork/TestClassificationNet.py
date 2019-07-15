@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from torchvision import models
 import numpy as np
-from TrainClassificationNetwork.DataSetLoader import ImageFilelist
+from TrainClassificationNetwork.DataSetLoader import ImageFileList
 import os
 
 """
@@ -30,7 +30,7 @@ MODEL_TYPE = "RESNET_18"
 
 
 def main():
-	test_data = ImageFilelist(".", FILE_LIST_TEST)
+	test_data = ImageFileList(".", FILE_LIST_TEST)
 	test_loader = torch.utils.data.DataLoader(test_data, batch_size=BATCH_SIZE, drop_last=False)
 
 	# Evaluate on CUDA if possible

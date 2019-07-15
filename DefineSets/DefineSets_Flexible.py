@@ -3,6 +3,8 @@ import os
 import json
 import random
 
+from argparse import ArgumentParser
+
 """
 Martin Leipert
 martin.leipert@fau.de
@@ -16,7 +18,6 @@ KEINEURKUNDEN_DIR = "/home/martin/Forschungspraktikum/Testdaten/KeineNotarsurkun
 
 # Where the defined sets are stored
 STORE_DIR = "/home/martin/Forschungspraktikum/Testdaten/Sets/"
-STORE_FILE = "full_set"
 
 # Tags for the Json Files
 TAG_TRAINING_SET = "TRAINING_SET"
@@ -26,41 +27,56 @@ TAG_VALIDATION_SET = "VALIDATION_SET"
 TAG_URKUNDEN = "URKUNDEN"
 TAG_KEINE_URKUNDEN = "KEINE_URKUNDEN"
 
-# How many data of the set to use for  testing
-PERCENTAGE_TEST = 0.25
-# Percentage of the data in training actually used for validation
-PERCENTAGE_VALIDATION = 1. / 3.
-
-MODE = 1
-
-REDUCE_SET = False
-REDUCTION = 0.01
-BALANCE_SET = False
-
 
 # Main method which shuffles and splits the sets
 def main():
+	arg_parser = ArgumentParser("Parametrizable set creator")
+	arg_parser.add_argument("SET_NAME", help="name of the set")
+	arg_parser.add_argument("PERCENTAGE_TEST", type=float, help="How many files will be used for testing")
+	arg_parser.add_argument("PERCENTAGE_VALIDATION", type=float, help="How many files will be used for validation")
+	arg_parser.add_argument("--storeMode", type=str, default="TEXT",
+							help="How to store as json or txt. Possible Inputs: 'TEXT', 'JSON'")
+	arg_parser.add_argument("--reduceByPercent", type=float, default=None,
+							help="Give a percentage to which the set will be reduced. No reduction if not given")
+	arg_parser.add_argument("--balanceSet", type=bool, default=False,
+							help="Use as many notary documents as non-notary in the set. "
+								"Of course it only works for small sets")
+
+	parsed_args = arg_parser.parse_args()
+
+	set_name = parsed_args.SET_NAME
+	# How many data of the set to use for  testing
+	percentage_test = parsed_args.PERCENTAGE_TEST
+	# Percentage of the data in training actually used for validation
+	percentage_validation = parsed_args.PERCENTAGE_VALIDATION
+
+	store_mode = parsed_args.storeMode
+
+	reduce_set = False if parsed_args.reduceByPercent is None else True
+	reduction = parsed_args.reduceByPercent
+	balance_set = parsed_args.balanceSet
+
 	# Get the filelist from the directories
 	set_notarsurkunden = list_files_full_path(NOTARSURKUNDEN_DIR)
 	set_keine_urkunden = list_files_full_path(KEINEURKUNDEN_DIR)
 
-	if REDUCE_SET:
-		set_notarsurkunden, set_keine_urkunden = reduce_sets([set_notarsurkunden, set_keine_urkunden], REDUCTION)
+	if reduce_set:
+		set_notarsurkunden, set_keine_urkunden = reduce_sets([set_notarsurkunden, set_keine_urkunden], reduction)
 
-	if BALANCE_SET:
+	if balance_set:
 		set_notarsurkunden, set_keine_urkunden = balance_sets([set_notarsurkunden, set_keine_urkunden])
 
 	# Get the sets
 	# Notary documents
 	training_urkunden, validation_urkunden, test_urkunden = \
-		split_set(set_notarsurkunden, PERCENTAGE_TEST, PERCENTAGE_VALIDATION)
+		split_set(set_notarsurkunden, percentage_test, percentage_validation)
 
 	# Not notary documents
 	(training_keine_urkunden, validation_keine_urkunden, test_keine_urkunden) = \
-		split_set(set_keine_urkunden, PERCENTAGE_TEST, PERCENTAGE_VALIDATION)
+		split_set(set_keine_urkunden, percentage_test, percentage_validation)
 
 	# Mode == 0 -> JSON
-	if MODE == 0:
+	if store_mode == "JSON":
 
 		# Store into a dictionary
 		data_dict = dict()
@@ -78,7 +94,7 @@ def main():
 		}
 
 		# Combine the path to store in
-		storage_path = os.path.join(STORE_DIR, STORE_FILE + ".json")
+		storage_path = os.path.join(STORE_DIR, set_name + ".json")
 
 		# Store in a json file
 		with open(storage_path, "w") as openfile:
@@ -86,25 +102,25 @@ def main():
 		pass
 
 	# Mode == 0 -> FILES
-	elif MODE == 1:
+	elif store_mode == "TEXT":
 
 		training_set = [
 			(training_keine_urkunden, 0),
 			(training_urkunden, 1)
 		]
-		store_list(os.path.join(STORE_DIR, STORE_FILE, "traindata.txt"), training_set)
+		store_list(os.path.join(STORE_DIR, set_name, "traindata.txt"), training_set)
 
 		validation_set = [
 			(validation_keine_urkunden, 0),
 			(validation_urkunden, 1)
 		]
-		store_list(os.path.join(STORE_DIR, STORE_FILE, "validationdata.txt"), validation_set)
+		store_list(os.path.join(STORE_DIR, set_name, "validationdata.txt"), validation_set)
 
 		test_set = [
 			(test_keine_urkunden, 0),
 			(test_urkunden, 1)
 		]
-		store_list(os.path.join(STORE_DIR, STORE_FILE, "testdata.txt"), test_set)
+		store_list(os.path.join(STORE_DIR, set_name, "testdata.txt"), test_set)
 
 
 # Store as file list in plain text
@@ -190,7 +206,6 @@ def reduce_sets(data_sets, factor):
 
 	return new_sets
 # endregion Helpers for Class Distribution
-
 
 
 if __name__ == '__main__':
