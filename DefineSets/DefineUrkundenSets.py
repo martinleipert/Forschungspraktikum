@@ -2,7 +2,7 @@ import os
 import random
 import numpy
 from xml.etree import ElementTree as ET
-
+from argparse import ArgumentParser
 
 """
 Define the Notarsurkunden Sets for the UNet Training
@@ -18,22 +18,31 @@ REGION_TYPES = {
 	"GraphicRegion": 3
 }
 
-# How many data of the set to use for  testing
-PERCENTAGE_TEST = 0.1
-# Percentage of the data in training actually used for validation
-PERCENTAGE_VALIDATION = 1. / 9.
-
-NOTARSURKUNDEN_SETS = "/home/martin/Forschungspraktikum/Testdaten/Segmentation_Sets/"
-NOTARSURKUNDEN_DIR = "/home/martin/Forschungspraktikum/Testdaten/Transkribierte_Notarsurkunden/" \
-					 "notarskurkunden_mom_restored/"
-
-REDUCE_SET = False
-REDUCTION = 0.5
-
-SET_NAME = "full_set"
+SET_ROOT = "/home/martin/Forschungspraktikum/Testdaten"
+NOTARSURKUNDEN_SETS = f"{SET_ROOT}/Segmentation_Sets/"
+NOTARSURKUNDEN_DIR = f"{SET_ROOT}/Transkribierte_Notarsurkunden/notarskurkunden_mom_restored/"
 
 
 def main():
+	arg_parser = ArgumentParser("Define sets for the Training of the Segmentation Network")
+	arg_parser.add_argument("SET_NAME", help="Desired name of the set")
+	arg_parser.add_argument("PERCENTAGE_TEST", type=float, help="How many percent to use for testing")
+	arg_parser.add_argument("PERCENTAGE_VALIDATION", type=float,
+							help="How many percent of the remaining are used for validation")
+	arg_parser.add_argument("--sizeReduction", type=float, default=None, help="Reduce the set by how many percent")
+
+	parsed_args = arg_parser.parse_args()
+
+	reduce_set = False if parsed_args.sizeReduction is None else True
+	reduction = parsed_args.sizeReduction
+
+	set_name = arg_parser.SET_NAME
+
+	# How many data of the set to use for  testing
+	percentage_test = parsed_args.PERCENTAGE_TEST
+	# Percentage of the data in training actually used for validation
+	percentage_validation = parsed_args.PERCENTAGE_VALIDATION
+
 	file_list = []
 
 	ns = '{' + SCHEMA + '}'
@@ -70,25 +79,25 @@ def main():
 	# Calculate the indices
 	nr_idx = len(file_list)
 
-	if REDUCE_SET:
-		nr_idx = nr_idx*REDUCTION
+	if reduce_set:
+		nr_idx = nr_idx*reduction
 
 	# Calculate the indices
-	perc_trainval = (1 - PERCENTAGE_TEST)
-	train_idx = numpy.round(nr_idx * perc_trainval * (1 - PERCENTAGE_VALIDATION))
-	val_idx = train_idx + numpy.round(nr_idx * perc_trainval * PERCENTAGE_VALIDATION)
+	perc_trainval = (1 - percentage_test)
+	train_idx = numpy.round(nr_idx * perc_trainval * (1 - percentage_validation))
+	val_idx = train_idx + numpy.round(nr_idx * perc_trainval * percentage_validation)
 
 	# Compose the sets
 	train_set = file_list[0:int(train_idx-1)]
 	val_set = file_list[int(train_idx):int(val_idx-1)]
 	test_set = file_list[int(val_idx):int(numpy.round(nr_idx))]
 
-	store_dir = os.path.join(NOTARSURKUNDEN_SETS, SET_NAME)
+	store_dir = os.path.join(NOTARSURKUNDEN_SETS, set_name)
 
 	if not os.path.exists(store_dir):
 		os.mkdir(store_dir)
 
-	# Wirte into a File
+	# Write into a File
 	train_file = os.path.join(store_dir, "training.txt")
 	store_list(train_file, train_set)
 	val_file = os.path.join(store_dir, "validation.txt")

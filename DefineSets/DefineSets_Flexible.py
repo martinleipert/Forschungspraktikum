@@ -19,6 +19,7 @@ KEINEURKUNDEN_DIR = "/home/martin/Forschungspraktikum/Testdaten/KeineNotarsurkun
 # Where the defined sets are stored
 STORE_DIR = "/home/martin/Forschungspraktikum/Testdaten/Sets/"
 
+
 # Tags for the Json Files
 TAG_TRAINING_SET = "TRAINING_SET"
 TAG_TEST_SET = "TEST_SET"
@@ -33,7 +34,8 @@ def main():
 	arg_parser = ArgumentParser("Parametrizable set creator")
 	arg_parser.add_argument("SET_NAME", help="name of the set")
 	arg_parser.add_argument("PERCENTAGE_TEST", type=float, help="How many files will be used for testing")
-	arg_parser.add_argument("PERCENTAGE_VALIDATION", type=float, help="How many files will be used for validation")
+	arg_parser.add_argument("PERCENTAGE_VALIDATION", type=float, 
+						help="How many files of the remaining will be used for validation")
 	arg_parser.add_argument("--storeMode", type=str, default="TEXT",
 							help="How to store as json or txt. Possible Inputs: 'TEXT', 'JSON'")
 	arg_parser.add_argument("--reduceByPercent", type=float, default=None,

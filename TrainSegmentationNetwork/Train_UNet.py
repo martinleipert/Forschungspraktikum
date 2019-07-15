@@ -2,15 +2,14 @@ from collections import defaultdict
 import torch.nn.functional as F
 from UNet.DiceLoss import dice_loss
 import time
-import copy
 import torch
-# from UNet.pytorch_unet import UNet
 from UNet.BatchNormUNet import UNet
-# from UNet.ThirdUNet import UNet
-from UNetLoader_dynamic import UNetDatasetDynamicMask
+from TrainSegmentationNetwork.UNetLoader_dynamic import UNetDatasetDynamicMask
 from torch.optim import lr_scheduler
 from UNet.FocalLoss import FocalLoss2d
 import logging
+from argparse import ArgumentParser
+from Augmentations.Augmentations import weak_augmentation, moderate_augmentation, heavy_augmentation
 
 import sys
 from matplotlib import pyplot
@@ -25,23 +24,13 @@ Stolen from
 https://github.com/usuyama/pytorch-unet
 """
 
-SET_NAME = "mini_set"
 
-FILE_LIST_TRAINING = "/home/martin/Forschungspraktikum/Testdaten/Segmentation_Sets/%s/training.txt" % SET_NAME
-FILE_LIST_VALIDATION = "/home/martin/Forschungspraktikum/Testdaten/Segmentation_Sets/%s/validation.txt" % SET_NAME
+DIR_ROOT = "/home/martin/Forschungspraktikum/Testdaten/Segmentation_Sets"
 
 BATCH_SIZE = 5
 NUM_CLASS = 4
-NUM_EPOCHS = 45
-# Step size of Learning rate decay
-LR_STEP_SIZE = 15
 
-# FOCAL or BCE_DICE
-UNET_LOSSFKT = "FOCAL"
-LOAD_MODEL = False
-SAVE_MODEL = True
-MODEL_NAME = "unet_mini_set_training.pth"
-
+# Precomputed weights for the classes according to their occurence frequency in the set
 WEIGHTS = [
     0.4124711540461253,
     0.8165794359287605,
@@ -49,39 +38,90 @@ WEIGHTS = [
     4.853207270061199
 ]
 
-TRAIN_LOSSES_WEIGHTING = {
-    "BCE_LOSS" : 0,
-    "DICE_LOSS" : 0,
-    "FOCAL_LOSS" : 1
-}
-
 VAL_LOSSES_WEIGHTING = {
-    "BCE_LOSS" : 0.33,
-    "DICE_LOSS" : 0.33,
-    "FOCAL_LOSS" : 0.33
+    "BCE_LOSS": 0.33,
+    "DICE_LOSS": 0.33,
+    "FOCAL_LOSS": 0.33
 }
 
-__LOG_PATH = f"TrainingLogs/Training_Log_{MODEL_NAME}_{SET_NAME}.txt"
 formatter = logging.Formatter('%(asctime)s\n%(message)s')
 
-file_handler = logging.FileHandler(__LOG_PATH)
-file_handler.setLevel(logging.DEBUG)
-file_handler.setFormatter(formatter)
 cmd_handler = logging.StreamHandler(sys.stdout)
 cmd_handler.setLevel(logging.DEBUG)
 cmd_handler.setFormatter(formatter)
 
 __LOGGER__ = logging.Logger("Training Logger")
-__LOGGER__.addHandler(file_handler)
 __LOGGER__.addHandler(cmd_handler)
 
 
 def main():
+    arg_parser = ArgumentParser("Train a UNet with the parameters given by the Parser")
+    arg_parser.add_argument("SET_NAME", help="Name of the set used for training")
+    arg_parser.add_argument("BCE", type=float, help="Weight of the bce loss function")
+    arg_parser.add_argument("DICE", type=float, help="Weight of the dice loss function")
+    arg_parser.add_argument("FOCAL", type=float, help="Weight of the focal loss function")
+    arg_parser.add_argument("AUGMENTATION", type=str, help="Selected Augmentation: 'WEAK', 'MODERATE', 'HEAVY'")
+    arg_parser.add_argument("--learningRate", type=float, default=1e-3)
+    arg_parser.add_argument("--epochs", type=int, default=45)
+    arg_parser.add_argument("--lrStep", type=int, default=15)
+    arg_parser.add_argument("--regionSelect", type=bool, default="Use the region select to counter class imbalance")
+
+    parsed_args = arg_parser.parse_args()
+
+    augmentation_fct = parsed_args.AUGMENTATION
+
+    train_fresh = False
+
+    set_name = parsed_args.SET_NAME
+    model_name = "unet_%s_training.pth" % set_name
+
+    learning_rate = parsed_args.learningRate
+    num_epochs = parsed_args.epochs
+    # Step size of Learning rate decay
+    lr_step_size = parsed_args.lrStep
+    region_select = parsed_args.regionSelect
+
+    train_losses_weighting = {
+        "BCE_LOSS": parsed_args.BCE,
+        "DICE_LOSS": parsed_args.DICE,
+        "FOCAL_LOSS": parsed_args.FOCAL
+    }
+
+    file_list_training = f"%s/%s/training.txt" % (DIR_ROOT, set_name)
+    file_list_validation = f"%s/%s/validation.txt" % (DIR_ROOT, set_name)
+
+    __LOG_PATH = f"TrainingLogs/Training_Log_{model_name}_{set_name}.txt"
+    file_handler = logging.FileHandler(__LOG_PATH)
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter)
+    __LOGGER__.addHandler(file_handler)
+
+    __LOGGER__.info(f"Start Training of {model_name}\n"
+                    f"Training on {set_name}\n"
+                    f"Learning Rate: {learning_rate}\n"
+                    f"Batch size: {BATCH_SIZE}\n"
+                    f"Epochs: {num_epochs}\n"
+                    f"Learning Rate Step Size: {lr_step_size}\n"
+                    f"Loss composition: {train_losses_weighting}\n"
+                    f"Augmentation function: {augmentation_fct}\n"
+                    f"Region select: {region_select}\n")
+
+    """
+    Prepare the data
+    """
+    if augmentation_fct == "WEAK":
+        augmentation_fct = weak_augmentation
+    elif augmentation_fct == "MODERATE":
+        augmentation_fct = moderate_augmentation
+    elif augmentation_fct == "HEAVY":
+        augmentation_fct = heavy_augmentation
+
     torch.cuda.empty_cache()
 
     # Load with self written FIle loader
-    training_data = UNetDatasetDynamicMask(FILE_LIST_TRAINING, region_select=True, augment=True)
-    validation_data = UNetDatasetDynamicMask(FILE_LIST_VALIDATION, region_select=False)
+    training_data = UNetDatasetDynamicMask(file_list_training, region_select=region_select,
+                                           augmentation=augmentation_fct)
+    validation_data = UNetDatasetDynamicMask(file_list_validation, region_select=False)
 
     # Define the DataLoader
     train_loader = torch.utils.data.DataLoader(training_data, batch_size=BATCH_SIZE)
@@ -90,9 +130,9 @@ def main():
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(device)
 
-    if LOAD_MODEL is True:
+    if train_fresh is True:
         model = UNet(NUM_CLASS)
-        model.load_state_dict(torch.load("TrainedModels/%s" % MODEL_NAME))
+        model.load_state_dict(torch.load("TrainedModels/%s" % model_name))
     else:
         model = UNet(NUM_CLASS)
     model.to(device)
@@ -102,8 +142,8 @@ def main():
     #    for param in l.parameters():
     #        param.requires_grad = False
 
-    optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-3)
-    exp_lr_scheduler = lr_scheduler.StepLR(optimizer, step_size=LR_STEP_SIZE, gamma=0.5)
+    optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate)
+    exp_lr_scheduler = lr_scheduler.StepLR(optimizer, step_size=lr_step_size, gamma=0.5)
 
     """
     Here  it  could be separated into a method
@@ -120,7 +160,7 @@ def main():
     loss_ax.set_xlabel("Epochs")
     loss_ax.set_ylabel("")
     loss_ax.set_ylim([0, 1])
-    loss_ax.set_title("Loss-Curves of %s" % MODEL_NAME)
+    loss_ax.set_title("Loss-Curves of %s" % model_name)
 
     train_loss_curve, = loss_ax.plot([], 'b-', label="Training Loss")
     validation_loss_curve, = loss_ax.plot([], 'r-', label="Validation Loss")
@@ -129,12 +169,12 @@ def main():
 
     start_time = time.time()
 
-    for epoch in range(NUM_EPOCHS):
+    for epoch in range(num_epochs):
 
         # Start the training phase of an epoch
         epoch_start = time.time()
 
-        __LOGGER__.info(f'\n{epoch_start - start_time} s elapsed\nEpoch {epoch + 1 }/{NUM_EPOCHS}')
+        __LOGGER__.info(f'\n{epoch_start - start_time} s elapsed\nEpoch {epoch + 1 }/{num_epochs}')
         __LOGGER__.info('-' * 10)
 
         exp_lr_scheduler.step()
@@ -158,7 +198,7 @@ def main():
             # track history if only in train
             outputs = model.forward(images)
 
-            loss = calc_loss(outputs, masks, metrics, TRAIN_LOSSES_WEIGHTING)
+            loss = calc_loss(outputs, masks, metrics, train_losses_weighting)
 
             # backward + optimize only if in training phase
             loss.backward()
@@ -203,12 +243,12 @@ def main():
         validation_loss_curve.set_ydata(np.array(validation_losses))
         loss_ax.set_xlim((-1, len(validation_losses)))
         pyplot.pause(0.05)
-        loss_fig.savefig("TrainingLogs/%s_%s.png" % (MODEL_NAME, SET_NAME), dpi=200)
+        loss_fig.savefig("TrainingLogs/%s_%s.png" % (model_name, set_name), dpi=200)
 
-        if epoch % 5 == 4 and SAVE_MODEL:
-            torch.save(model.state_dict(), "TrainedModels/%s" % MODEL_NAME)
+        if epoch % 5 == 4:
+            torch.save(model.state_dict(), "TrainedModels/%s" % model_name)
 
-    torch.save(model.state_dict(), "TrainedModels/%s" % MODEL_NAME)
+    torch.save(model.state_dict(), "TrainedModels/%s" % model_name)
 
     pass
 

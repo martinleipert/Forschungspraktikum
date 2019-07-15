@@ -9,6 +9,7 @@ Originally by
 University of Tokyo Doi Kento 
 """
 
+import numpy
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -23,7 +24,10 @@ class FocalLoss2d(nn.Module):
 		super(FocalLoss2d, self).__init__()
 
 		self.gamma = gamma
-		self.weight = weight
+		if weight is not None:
+			self.weight = numpy.float64(weight)
+		else:
+			self.weight = None
 
 		self.size_average = size_average
 
@@ -58,15 +62,14 @@ class FocalLoss2d(nn.Module):
 		loss[torch.isnan(loss)] = 0
 		loss[torch.isinf(loss)] = 0
 
-
 		# Is implemented for four classes
-		if self.weight:
-			weight = Variable(self.weight).to('gpu')
+		if self.weight is not None:
+			weight = Variable(torch.tensor(self.weight)).to('cuda')
 			# Weight the samples accordingly
 			tensor_weights = torch.zeros_like(loss)
+			repeated_weight = weight.repeat(tensor_weights.size(0), 1)
 
-			for i in range(4):
-				tensor_weights = tensor_weights + torch.where(target[:, i, :, :] == 1, weight[i], tensor_weights)
+			tensor_weights = torch.where(target == 1, repeated_weight, tensor_weights)
 			loss = tensor_weights * loss
 
 		# averaging (or not) loss

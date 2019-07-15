@@ -6,19 +6,7 @@ import os
 from xml.etree import ElementTree as ET
 # For random region selection
 import random
-import cv2
-from torch import tensor
-from Augmentations.Augmentations import weak_augmentation
-
-from albumentations import (
-    HorizontalFlip, IAAPerspective, ShiftScaleRotate, CLAHE, RandomRotate90,
-    Transpose, ShiftScaleRotate, Blur, OpticalDistortion, GridDistortion, HueSaturationValue,
-    IAAAdditiveGaussianNoise, GaussNoise, MotionBlur, MedianBlur, IAAPiecewiseAffine,
-    IAASharpen, IAAEmboss, RandomBrightnessContrast, Flip, OneOf, Compose, ElasticTransform
-)
-
-
-from matplotlib import pyplot as plt
+import torch
 
 """
 Martin Leipert
@@ -114,7 +102,6 @@ def dynamic_mask_loader(path, augmentation=None, region_select=False, p_region_s
     if region_select:
         randint = random.randint(1, 100)
 
-        # TODO: Use different snippet sizes so validation loss gets reduced
         if randint < 75:
             elidx = random.randint(0, len(all_els)-1)
             element = all_els[elidx]
@@ -153,23 +140,18 @@ def dynamic_mask_loader(path, augmentation=None, region_select=False, p_region_s
     # Augmentation-independent Transformation -> TO Tensor
     trans3 = TF.ToTensor()
 
+    trans1 = TF.Resize(256)
+    trans2 = TF.CenterCrop(224)
 
-    if augmentation is None:
-        trans1 = TF.Resize(256)
-        trans2 = TF.CenterCrop(224)
-
-        trafo_img = trans3(trans2(trans1(image)))
-        trafo_mask = np.array([np.array(trans3(trans2(trans1(Image.fromarray(mask_array[:, :, i]))))) for i in range(np.shape(mask_array)[2])])
-    else:
-
+    if augmentation is not None:
         transformed = augmentation(image=np.array(image), mask=mask_array)
 
-        trafo_img = trans3(transformed['image'])
-        trafo_mask = trans3(transformed['mask'])
+        image = Image.fromarray(transformed['image'])
+        mask_array = transformed['mask']
 
-        pass
-
-    # print("%s, %s, %s, %s" % (path, str(image.size), image.mode, str(trafo_mask.shape)))
+    trafo_img = trans3(trans2(trans1(image)))
+    mask_array = [np.array(trans2(trans1(Image.fromarray(mask_array[:, :, i])))) for i in range(np.shape(mask_array)[2])]
+    trafo_mask = torch.tensor(np.float64(mask_array)).to('cuda')
 
     return trafo_img, trafo_mask
 
@@ -180,12 +162,15 @@ A Dataset containing data from a list which is built of tuples:
 
 
 class UNetDatasetDynamicMask(Dataset):
-    def __init__(self, file_path, transform=None, data_set_loader=dynamic_mask_loader, augment=True,
-                 region_select=False, augmentation=weak_augmentation):
+    def __init__(self, file_path, transform=None, data_set_loader=dynamic_mask_loader,
+                 region_select=False, augmentation=None):
         self.input_images = []
         self.data_set_loader = data_set_loader
-        self.augment = augment
-        self.augmentation = augmentation()
+        self.augment = False
+        self.augmentation = None
+        if augmentation is not None:
+            self.augment = True
+            self.augmentation = augmentation()
         self.region_select = region_select
 
         with open(file_path) as open_file:
@@ -207,22 +192,25 @@ class UNetDatasetDynamicMask(Dataset):
     def __getitem__(self, idx):
         image_path = self.input_images[idx]
 
-        image, mask = self.data_set_loader(image_path, region_select=self.region_select)
+        image, mask = self.data_set_loader(image_path, region_select=self.region_select, augmentation=self.augmentation)
 
+        """
         if self.transform:
             image = self.transform(image)
             mask = self.transform(mask)
+        
 
         if self.augment is True:
-            image, mask = self.augmentation(image, mask)
+            image, mask, im_path = self.augmentation(image, mask)
 
             image = tensor(np.float32(image))
             mask = tensor(mask)
+        """
 
         # Todo: Remove!
-        trafo = transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        # trafo = transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 
-        image = trafo(image)
+        # image = trafo(image)
 
         return [image, mask, image_path]
 
