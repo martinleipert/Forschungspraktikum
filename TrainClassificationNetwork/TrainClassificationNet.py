@@ -62,9 +62,9 @@ def main():
 	argparser.add_argument("--trainFresh", type=bool, default=True,
 							help="Train a fresh model. If False the last state of the previous is loaded")
 	argparser.add_argument("-LR", "--learningRate", type=float, default=1e-3, help="Initial Learning Rate")
-	argparser.add_argument("--epochs", type=int, default=15, help="Number of epochs")
-	argparser.add_argument("--lrStep", type=int, default=5, help="Step Learning Rate after n epochs")
-	argparser.add_argument("--enrichFactor", type=int, default=8,
+	argparser.add_argument("--epochs", type=int, default=12, help="Number of epochs")
+	argparser.add_argument("--lrStep", type=int, default=4, help="Step Learning Rate after n epochs")
+	argparser.add_argument("--enrichFactor", type=int, default=32,
 							help="Factor to increase drawing rate of notary documents")
 	argparser.add_argument("--swapSign", type=bool, default=False, help="Augment by swapping notary sign")
 

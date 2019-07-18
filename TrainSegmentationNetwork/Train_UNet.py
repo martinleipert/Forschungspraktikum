@@ -62,8 +62,8 @@ def main():
     arg_parser.add_argument("FOCAL", type=float, help="Weight of the focal loss function")
     arg_parser.add_argument("AUGMENTATION", type=str, help="Selected Augmentation: 'WEAK', 'MODERATE', 'HEAVY'")
     arg_parser.add_argument("--learningRate", type=float, default=1e-3)
-    arg_parser.add_argument("--epochs", type=int, default=45)
-    arg_parser.add_argument("--lrStep", type=int, default=15)
+    arg_parser.add_argument("--epochs", type=int, default=30)
+    arg_parser.add_argument("--lrStep", type=int, default=10)
     arg_parser.add_argument("--regionSelect", type=bool, default="Use the region select to counter class imbalance")
 
     parsed_args = arg_parser.parse_args()
