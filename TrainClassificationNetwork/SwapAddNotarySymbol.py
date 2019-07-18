@@ -122,10 +122,10 @@ class SymbolSwapper:
 
 if __name__ == '__main__':
 	test_path = "/home/martin/Forschungspraktikum/Testdaten/Transkribierte_Notarsurkunden/" \
-	            "notarskurkunden_mom_restored/0547_de_bayhsta_ku-rohr_0327_14691118_2c180219-9671-4dda-80a8-fbc33230fd9d_r.jpg"
+				"notarskurkunden_mom_restored/0547_de_bayhsta_ku-rohr_0327_14691118_2c180219-9671-4dda-80a8-fbc33230fd9d_r.jpg"
 
 	notary_root = "/home/martin/Forschungspraktikum/Testdaten/Transkribierte_Notarsurkunden/" \
-	              "notarskurkunden_mom_restored/"
+					"notarskurkunden_mom_restored/"
 	notary_files = os.listdir(notary_root)
 
 	notary_files = [os.path.join(notary_root, notary_file) for notary_file in notary_files]

@@ -7,6 +7,16 @@ BATCH_SIZE = 128
 FILE_LIST = "/home/martin/Forschungspraktikum/Testdaten/Segmentation_Sets/all_files"
 
 
+"""
+Martin Leipert
+martin.leipert@fau.de
+
+Load all images from the segmentation dataset and 
+sum up the pixels for each segmentation channel
+-> Leads to an occurence statistics
+"""
+
+
 def main():
 
 	data = UNetDatasetDynamicMask(FILE_LIST, region_select=False)
@@ -22,6 +32,7 @@ def main():
 
 	print(f"Weights {weights[0, 0]}, {weights[0, 1]}, {weights[0, 2]}, {weights[0, 3]}")
 
+	# Write to a file to store
 	with open("calculated_weights.txt", "w") as openfile:
 		openfile.write(f"Weights {weights[0, 0]}, {weights[0, 1]}, {weights[0, 2]}, {weights[0, 3]}")
 

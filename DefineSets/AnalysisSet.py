@@ -36,7 +36,7 @@ notarsurkunden_files = os.listdir(notarsurkunden_home)
 random.shuffle(notarsurkunden_files)
 notarsurkunden_files = notarsurkunden_files[0:file_no]
 
-# Copy
+# Copy in the seperate directory
 for number, file in enumerate(notarsurkunden_files):
 	src = os.path.join(notarsurkunden_home, file)
 	dest = os.path.join(analysis_dir, "%i_%s" % (number, file))

@@ -103,8 +103,8 @@ def dynamic_mask_loader(path, augmentation=None, region_select=False, p_region_s
         randint = random.randint(1, 100)
 
         if randint < 75:
-            elidx = random.randint(0, len(all_els)-1)
-            element = all_els[elidx]
+            el_idx = random.randint(0, len(all_els)-1)
+            element = all_els[el_idx]
             points = element.find(ns + 'Coords').get('points')
             fix_pts = tuple(map(lambda x: tuple(map(int, x.split(','))), points.split(' ')))
 
@@ -133,7 +133,6 @@ def dynamic_mask_loader(path, augmentation=None, region_select=False, p_region_s
 
                     cropped_mask[:, :, i] = np.array(tmp_im)
 
-                horst = 1
                 mask_array = cropped_mask
                 pass
 
@@ -194,24 +193,6 @@ class UNetDatasetDynamicMask(Dataset):
 
         image, mask = self.data_set_loader(image_path, region_select=self.region_select, augmentation=self.augmentation)
 
-        """
-        if self.transform:
-            image = self.transform(image)
-            mask = self.transform(mask)
-        
-
-        if self.augment is True:
-            image, mask, im_path = self.augmentation(image, mask)
-
-            image = tensor(np.float32(image))
-            mask = tensor(mask)
-        """
-
-        # Todo: Remove!
-        # trafo = transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-
-        # image = trafo(image)
-
         return [image, mask, image_path]
 
 
@@ -221,7 +202,7 @@ if __name__ == "__main__":
 
     file = "/home/martin/Forschungspraktikum/Testdaten/Transkribierte_Notarsurkunden/" \
            "notarskurkunden_mom_restored/0001_ABP_14341123_PfA-Winzer-U-0002-0_r.jpg"
-    trafo_img, trafo_mask = dynamic_mask_loader(file, region_select=False, augmentation=moderate_augmentation())
-    pyplot.imshow(trafo_img.numpy()[0, :, :])
-    pyplot.imshow(trafo_mask.numpy()[0, :, :])
+    timg, tmask = dynamic_mask_loader(file, region_select=False, augmentation=moderate_augmentation())
+    pyplot.imshow(timg.numpy()[0, :, :])
+    pyplot.imshow(tmask.numpy()[0, :, :])
     pass

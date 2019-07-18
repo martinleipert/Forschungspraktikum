@@ -1,6 +1,14 @@
 import os
 from xml.etree import ElementTree as ET
 
+"""
+Martin Leipert
+martin.leipert@fau.de
+
+Count the occurence frequency of regions in Transkribus
+"""
+
+
 NOTARSURKUNDEN_XML_DIR = \
 	"/home/martin/Forschungspraktikum/Testdaten/Transkribierte_Notarsurkunden/notarskurkunden_mom_restored/page/"
 

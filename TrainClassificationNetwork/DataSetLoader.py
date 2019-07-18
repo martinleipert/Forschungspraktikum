@@ -69,28 +69,28 @@ def default_flist_reader(flist):
 class ImageFileList(data.Dataset):
 
 	def __init__(self, root, flist, transform=None, target_transform=None, augmentation=weak_augmentation(),
-				 flist_reader=default_flist_reader, loader=augmentation_loader, enrich_factor=1, swap=False,
-				 swap_probability=0.9):
+				flist_reader=default_flist_reader, loader=augmentation_loader, enrich_factor=1, swap=False,
+				swap_probability=0.9):
 		self.enrich_factor = enrich_factor
 		self.root = root
-		self.imlist = flist_reader(flist)
-		self.org_list = self.imlist
+		self.im_list = flist_reader(flist)
+		self.org_list = self.im_list
 		if enrich_factor <= 1:
-			self.imlist = self.imlist
+			self.im_list = self.im_list
 		else:
-			self.imlist = ImageFileList.augment_imlist(self.imlist, enrich_factor)
+			self.im_list = ImageFileList.augment_imlist(self.im_list, enrich_factor)
 		self.transform = transform
 		self.target_transform = target_transform
 		self.loader = loader
 		self.augmentation = augmentation
 
-		self.swap_probability = 0.9
+		self.swap_probability = swap_probability
 		self.swapper = None
 		if swap is True:
 			self.swapper = SymbolSwapper(self.org_list)
 
 	def __getitem__(self, index):
-		impath, target = self.imlist[index]
+		impath, target = self.im_list[index]
 		img = self.loader(os.path.join(self.root, impath), target, augmentation=self.augmentation, swapper=self.swapper)
 		if self.transform is not None:
 			img = self.transform(img)
@@ -100,7 +100,7 @@ class ImageFileList(data.Dataset):
 		return img, target, impath
 
 	def __len__(self):
-		return len(self.imlist)
+		return len(self.im_list)
 
 	@classmethod
 	def augment_imlist(cls, im_list, enrich_factor):

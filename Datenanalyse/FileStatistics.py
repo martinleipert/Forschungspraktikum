@@ -7,6 +7,9 @@ from matplotlib import pyplot as plt
 """
 Martin Leipert
 martin.leipert@fau.de
+
+Statistics about the files and their age
+
 """
 
 PATH_NOTARSURKUNDEN = "/home/martin/Forschungspraktikum/Testdaten/Notarsurkunden/Notarsurkunden.xml"
@@ -16,12 +19,15 @@ TIME_STAMP_FORMAT = "%Y-%m-%d"
 
 
 def main():
-	notary_archiv_fonds, notary_dates_list = extract_params(PATH_NOTARSURKUNDEN)
-	no_not_archiv_fonds, no_not_dates_list = extract_params(PATH_KEINE_NOTARSURKUNDEN)
+	notary_archiv_fonds, notary_dates_list = extract_statistical_dates(PATH_NOTARSURKUNDEN)
+	no_not_archiv_fonds, no_not_dates_list = extract_statistical_dates(PATH_KEINE_NOTARSURKUNDEN)
 
 	notary_year_histo, year_bins = calc_date_statistics(notary_dates_list)
 	no_not_year_histo, year_bins = calc_date_statistics(no_not_dates_list)
 
+	"""
+	Plot the year statistics
+	"""
 	fig = plt.figure()
 	ax = fig.add_subplot(111)
 	ax.set_title("Year Statistics of the Documents")
@@ -40,6 +46,9 @@ def main():
 	set_sta_notary = set_statistics(notary_archiv_fonds, set_list)
 	set_sta_no_not = set_statistics(no_not_archiv_fonds, set_list)
 
+	"""
+	Plot the year statistics of both sets
+	"""
 	fig = plt.figure(figsize=(20, 7))
 	ax = fig.add_subplot(111)
 	ax.set_title("Share of the Sets")
@@ -54,13 +63,16 @@ def main():
 	fig.savefig("Plots/Set_Statistics.png", dpi=200, bbox_inches='tight',)
 
 
-def extract_params(xml_file):
+# Parse an xml to find relevant statistics
+def extract_statistical_dates(xml_file):
 
 	etree = ET.parse(xml_file)
+	charters = etree.getroot().findall("charter")
 
-	charters = etree._root.findall("charter")
-
+	# List the dates of creation
 	dates_list = []
+
+	# Archive fond -> source the document belongs to
 	archiv_fonds = []
 
 	for charter in charters:
@@ -72,9 +84,10 @@ def extract_params(xml_file):
 			# Handle the 29. Februar of 1415
 			year, month, day = map(int, re.search("(\d+)-(\d+)-(\d+)", date_str).groups())
 
+			# Handle exceptional cases like faulty dates
 			if day == 29 and month == 2:
 				date = datetime.date(year=year, month=month, day=day-1)
-			if day==99 or month ==99:
+			if day == 99 or month == 99:
 				date = datetime.date(year=year, month=1, day=1)
 
 		archiv_fonds.append(archiv_fond)
@@ -83,6 +96,7 @@ def extract_params(xml_file):
 	return archiv_fonds, dates_list
 
 
+# Calculate the statistics
 def calc_date_statistics(date_lists):
 	dates_as_ordinal = list(map(lambda x: x.toordinal(), date_lists))
 
@@ -100,6 +114,7 @@ def calc_date_statistics(date_lists):
 	return histo, year_bins
 
 
+# Get the statistics of the sets
 def set_statistics(all_items, set_list):
 
 	counts = {}

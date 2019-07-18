@@ -4,6 +4,8 @@ from torchvision import models
 import numpy as np
 from TrainClassificationNetwork.DataSetLoader import ImageFileList
 import os
+from argparse import ArgumentParser
+import re
 
 """
 Martin Leipert
@@ -16,49 +18,54 @@ Denotes the results as txt
 Denote missclassifications
 """
 
-SET_NAME = "equalized_set"
-
-FILE_LIST_TEST = "/home/martin/Forschungspraktikum/Testdaten/Sets/%s/testdata.txt" % SET_NAME
-
-MODEL_NAME = "equalized_set_resnet18_notarsurkunden_weak.pth"
 
 BATCH_SIZE = 128
 NUM_CLASSES = 2
 
-# "RESNET_18", "RESNET_50", "DENSENET_121"
-MODEL_TYPE = "RESNET_18"
-
 
 def main():
-	test_data = ImageFileList(".", FILE_LIST_TEST)
+	arg_parser = ArgumentParser("Evaluate a model")
+	arg_parser.add_argument("model_name", help="name of the model")
+
+	parsed_args = arg_parser.parse_args()
+	model_name = parsed_args.model_name
+
+	model_type = re.search("((?:resnet18)|(?:resnet50)|(?:densenet121))", model_name).group(1)
+	model_type = model_type.upper()
+
+	set_name = re.search("^(.*?_set)", model_name).groups(1)
+
+	file_list_test = "/home/martin/Forschungspraktikum/Testdaten/Sets/%s/testdata.txt" % set_name
+
+	test_data = ImageFileList(".", file_list_test)
 	test_loader = torch.utils.data.DataLoader(test_data, batch_size=BATCH_SIZE, drop_last=False)
 
 	# Evaluate on CUDA if possible
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-	if MODEL_TYPE == "RESNET_18":
+	if model_type == "RESNET18":
 		model_network = models.resnet18()
 		model_network.fc = nn.Sequential(
 			nn.Linear(512, BATCH_SIZE), nn.ReLU(), nn.Linear(BATCH_SIZE, 2), nn.LogSoftmax(dim=1))
-		model_network.load_state_dict(torch.load("TrainedModels/%s" % MODEL_NAME))
 
-	elif MODEL_TYPE == "RESNET_50":
+	elif model_type == "RESNET50":
 		model_network = models.resnet50()
 		model_network.fc = nn.Sequential(
 			nn.Linear(2048, BATCH_SIZE), nn.ReLU(), nn.Linear(BATCH_SIZE, 2), nn.LogSoftmax(dim=1))
-		model_network.load_state_dict(torch.load("TrainedModels/%s" % MODEL_NAME))
 
-	elif MODEL_TYPE == "DENSENET_121":
+	elif model_type == "DENSENET121":
 		# Pick the model
 		model_network = models.densenet121()
 		# -> Map the 1000 outputs to the 2 class problem
 		model_network.classifier = nn.Linear(1024, NUM_CLASSES)
-		model_network.load_state_dict(torch.load("TrainedModels/%s" % MODEL_NAME))
+
+	state_dict = torch.load("TrainedModels/%s" % model_name)
+	model_network.load_state_dict(state_dict)
 
 	# model_network.to(device)
 	torch.no_grad()
 
-	base_name = MODEL_NAME.rstrip(".pth")
+	base_name = model_name.rstrip(".pth")
 
 	# Loss functions for testing
 	nn_loss_fct = torch.nn.NLLLoss().to(device)

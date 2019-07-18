@@ -150,9 +150,10 @@ def heavy_augmentation():
 	color = OneOf([
 		# Histogram equalization
 		CLAHE(clip_limit=5, p=0.1),
-		HueSaturationValue(hue_shift_limit=20, sat_shift_limit=30, val_shift_limit=20, p=0.5),
+		HueSaturationValue(hue_shift_limit=20, sat_shift_limit=30, val_shift_limit=20, p=0.4),
 		RGBShift(r_shift_limit=30, g_shift_limit=30, b_shift_limit=30, p=0.3),
-		ToGray(p=0.1)
+		ToGray(p=0.1),
+		ChannelShuffle(p=0.1)
 	])
 
 	augmentation = Compose([flip, affine, noise_blur, distortion, effects, brightness_contrast, color], p=1)

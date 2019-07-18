@@ -28,7 +28,7 @@ NUM_CLASSES = 2
 
 # Fixed parameters for all models
 PRINT_EVERY_ITERATIONS = 25
-SAVE_EVERY_EPOCH = 1
+SAVE_EVERY_ITERATION = 50
 # endregion
 
 MODEL_PATHS = {
@@ -127,8 +127,8 @@ def main():
 	validation_loader = torch.utils.data.DataLoader(validation_data, batch_size=BATCH_SIZE)
 
 	# Count the classes for weighting
-	n_training_data = len(training_data.imlist)
-	labels_raw = list(map(lambda x: x[1], training_data.imlist))
+	n_training_data = len(training_data.im_list)
+	labels_raw = list(map(lambda x: x[1], training_data.im_list))
 	hist = []
 	for i in range(max(labels_raw) + 1):
 		hist.append(labels_raw.count(i))
@@ -323,12 +323,12 @@ def main():
 				model_network.train()
 				running_loss = 0
 
-		# Save the net after each 5 epoch
-		if epoch % SAVE_EVERY_EPOCH == (SAVE_EVERY_EPOCH-1):
-			torch.save(model_network.state_dict(), model_path)
+			# Save the net after each 5 epoch
+			if iteration_count % SAVE_EVERY_ITERATION == (SAVE_EVERY_ITERATION - 1):
+				torch.save(model_network.state_dict(), "TrainedModels/%s" % model_path)
 
 	# SAVE Model in the end
-	torch.save(model_network.state_dict(), model_path)
+	torch.save(model_network.state_dict(), "TrainedModels/%s" % model_path)
 
 	with open(os.path.join(f"TrainingLogs/Loss_Curve_{model_name}_{chosen_set}.txt")) as store_file:
 

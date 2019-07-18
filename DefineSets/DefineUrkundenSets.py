@@ -7,6 +7,7 @@ from argparse import ArgumentParser
 """
 Define the Notarsurkunden Sets for the UNet Training
 
+Sets are stored in directories which contain fies listing training, validation and test set
 """
 
 SCHEMA = "http://schema.primaresearch.org/PAGE/gts/pagecontent/2013-07-15"
@@ -54,13 +55,15 @@ def main():
 		if os.path.isfile(file_path):
 			if not file.lower().endswith('.jpg'):
 				continue
+
+			# Get the xml file
 			dir_name = os.path.dirname(file_path)
 			filename = os.path.basename(file_path).rsplit('.jpg')[0]
 			xml_filename = f"{filename}.xml"
 			xml_path = os.path.join(dir_name, 'page', xml_filename)
 
+			# Parse the xml
 			xml_tree = ET.parse(xml_path)
-
 			root = xml_tree.getroot()
 
 			# Filter unlabeled files
@@ -108,9 +111,7 @@ def main():
 
 
 def store_list(file_path, file_list):
-
 	with open(file_path, "w+") as openfile:
-
 		for file_of_set in file_list:
 			openfile.write("%s\n" % file_of_set)
 
