@@ -162,11 +162,41 @@ def main():
     loss_ax.set_ylabel("")
     loss_ax.set_ylim([0, 1])
     loss_ax.set_title("Loss-Curves of %s" % model_name)
+    loss_ax.legend(loc=1)
 
     train_loss_curve, = loss_ax.plot([], 'b-', label="Training Loss")
     validation_loss_curve, = loss_ax.plot([], 'r-', label="Validation Loss")
     loss_fig.show()
     pyplot.pause(0.05)
+
+    """
+    Initial loss 
+    """
+    metrics = defaultdict(float)
+    epoch_samples = 0
+
+    with torch.no_grad():
+        for images, masks, image_paths in validation_loader:
+            images = images.to(device)
+            masks = masks.to(device)
+
+            optimizer.zero_grad()
+
+            # forward
+            # track history if only in train
+            outputs = model(images)
+
+            calc_loss(outputs, masks, metrics, VAL_LOSSES_WEIGHTING).detach()
+
+            # statistics
+            epoch_samples += images.size(0)
+
+    print_metrics(metrics, epoch_samples, 'validation')
+
+    val_loss = metrics['loss']
+    validation_losses.append(val_loss)
+
+    __LOGGER__.info(f"Initial validation loss {val_loss}\n")
 
     start_time = time.time()
 
@@ -183,7 +213,6 @@ def main():
         # Training phase
         model.train()
         epoch_samples = 0
-        metrics = defaultdict(float)
 
         __LOGGER__.info("===== Training =====")
         # Image-wise Training
@@ -220,6 +249,7 @@ def main():
         metrics = defaultdict(float)
         epoch_samples = 0
         __LOGGER__.info("===== Validation =====")
+
         with torch.no_grad():
             for images, masks, image_paths in validation_loader:
                 images = images.to(device)
@@ -231,7 +261,7 @@ def main():
                 # track history if only in train
                 outputs = model(images)
 
-                loss = calc_loss(outputs, masks, metrics, VAL_LOSSES_WEIGHTING).detach()
+                calc_loss(outputs, masks, metrics, VAL_LOSSES_WEIGHTING).detach()
 
                 # statistics
                 epoch_samples += images.size(0)

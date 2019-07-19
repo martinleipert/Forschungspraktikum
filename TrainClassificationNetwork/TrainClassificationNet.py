@@ -209,7 +209,7 @@ def main():
 	loss_ax.set_ylabel("Losses")
 	loss_ax.set_ylim([0, 1])
 	loss_ax.set_title("Loss-Curves of %s" % model_name)
-	loss_ax.legend(loc=3)
+	loss_ax.legend(loc=1)
 
 	training_x_data = []
 	validation_x_data = []
@@ -278,6 +278,8 @@ def main():
 			training_x_data.append(iteration_count)
 			train_loss_curve.set_xdata(training_x_data)
 			train_loss_curve.set_ydata(numpy.array(train_losses))
+
+			__LOGGER__.info(f"Iteration {iteration_count} - Loss {current_loss} !\n")
 
 			if (iteration_count % PRINT_EVERY_ITERATIONS) == 0:
 				del inputs, labels, image_paths
