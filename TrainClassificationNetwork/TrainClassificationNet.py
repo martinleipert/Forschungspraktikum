@@ -59,14 +59,14 @@ def main():
 	argparser.add_argument("LOSS_FKT", type=str,
 							help="The chosen Loss function: 'CROSS_ENTROPY', 'NN_LOSS', 'FOCAL_LOSS'")
 	argparser.add_argument("AUGMENTATION", type=str, help="Selected Augmentation: 'WEAK', 'MODERATE', 'HEAVY'")
-	argparser.add_argument("--trainFresh", type=bool, default=False, action='store_true',
+	argparser.add_argument("--trainFresh", default=False, action='store_true',
 							help="Train a fresh model. If False the last state of the previous is loaded")
 	argparser.add_argument("-LR", "--learningRate", type=float, default=1e-3, help="Initial Learning Rate")
 	argparser.add_argument("--epochs", type=int, default=12, help="Number of epochs")
 	argparser.add_argument("--lrStep", type=int, default=4, help="Step Learning Rate after n epochs")
 	argparser.add_argument("--enrichFactor", type=int, default=32,
 							help="Factor to increase drawing rate of notary documents")
-	argparser.add_argument("--swapSign", type=bool, action='store_true', default=False, help="Augment by swapping notary sign")
+	argparser.add_argument("--swapSign", action='store_true', default=False, help="Augment by swapping notary sign")
 
 	args = argparser.parse_args()
 
