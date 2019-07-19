@@ -27,23 +27,17 @@ class SymbolSwapper:
 
 	def load_and_swap_symbol(self, org_doc):
 
+		only_add = random.randint(0, 1) == 1
+
 		org_xml = self.get_xml(org_doc)
 		swap_doc, swap_xml = self.get_random_file(org_doc)
 
 		org_image = Image.open(org_doc)
-
 		for i in range(3):
 			try:
 				org_image.load()
 			except Exception as e:
 				pass
-
-		for i in range(3):
-			try:
-				swap_image.load()
-			except Exception as e:
-				pass
-
 		org_image = org_image.convert('RGB')
 
 		# Not every notary document contains a signature
@@ -61,6 +55,12 @@ class SymbolSwapper:
 				swap_doc, swap_xml = self.get_random_file(org_doc)
 
 		swap_image = Image.open(swap_doc)
+		for i in range(3):
+			try:
+				swap_image.load()
+			except Exception as e:
+				pass
+
 		swap_image = swap_image.convert('RGB')
 
 		points = elem.find('{' + SCHEMA + '}' + 'Coords').get('points')
@@ -78,7 +78,7 @@ class SymbolSwapper:
 		root = xml_tree.getroot()
 		elem = root.find('*/{' + SCHEMA + '}' + REGION_TAG)
 
-		if elem is None:
+		if elem is None or only_add is True:
 
 			width, height = org_image.size
 			xbb, ybb = (500 + random.randint(0, width-1000), 500 + random.randint(0, height-1000))
@@ -128,7 +128,7 @@ if __name__ == '__main__':
 					"notarskurkunden_mom_restored/"
 	notary_files = os.listdir(notary_root)
 
-	notary_files = [os.path.join(notary_root, notary_file) for notary_file in notary_files]
+	notary_files = [(os.path.join(notary_root, notary_file), 1) for notary_file in notary_files]
 
 	swapper = SymbolSwapper(notary_files)
 	xml_test = swapper.get_xml(test_path)
@@ -136,6 +136,10 @@ if __name__ == '__main__':
 	if os.path.exists(xml_test) and os.path.isfile(xml_test):
 		print("XML exists and is valid")
 
-	swapper.load_and_swap_symbol(test_path)
+	image = swapper.load_and_swap_symbol(test_path)
 
+	from matplotlib import pyplot
+
+	pyplot.imshow(np.array(image))
+	pyplot.show()
 	pass

@@ -186,7 +186,7 @@ def main():
 		validation_criterion = nn.CrossEntropyLoss().to(device)
 
 	# Negative Log Likelihood
-	elif loss_fkt == "NN_LOSS":
+	elif loss_fkt == "NLLLOSS":
 		training_criterion = nn.NLLLoss(weight=torch.from_numpy(numpy.float32(weights)).to(device))
 		validation_criterion = nn.NLLLoss().to(device)
 
