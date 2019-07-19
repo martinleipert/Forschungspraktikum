@@ -17,7 +17,7 @@ Image.LOAD_TRUNCATED_IMAGES = True
 
 def augmentation_loader(path, label, augmentation=None, swapper=None):
 
-	if swapper and label == 1 and random.randint(1, 10) > 1:
+	if (swapper is not None) and (label == 1) and (random.randint(1, 10) > 1):
 		image = swapper.load_and_swap_symbol(path)
 
 	else:
@@ -37,7 +37,6 @@ def augmentation_loader(path, label, augmentation=None, swapper=None):
 		except Exception as e:
 			pass
 
-	# image.thumbnail((224, 224), Image.ANTIALIAS)
 	trans1 = transforms.Resize(256)
 	trans2 = transforms.CenterCrop(224)
 	trans3 = transforms.ToTensor()

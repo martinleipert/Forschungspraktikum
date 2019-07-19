@@ -27,8 +27,8 @@ BATCH_SIZE = 32
 NUM_CLASSES = 2
 
 # Fixed parameters for all models
-PRINT_EVERY_ITERATIONS = 25
-SAVE_EVERY_ITERATION = 50
+PRINT_EVERY_ITERATIONS = 50
+SAVE_EVERY_ITERATION = 200
 # endregion
 
 MODEL_PATHS = {
@@ -62,8 +62,8 @@ def main():
 	argparser.add_argument("--trainFresh", default=False, action='store_true',
 							help="Train a fresh model. If False the last state of the previous is loaded")
 	argparser.add_argument("-LR", "--learningRate", type=float, default=1e-3, help="Initial Learning Rate")
-	argparser.add_argument("--epochs", type=int, default=12, help="Number of epochs")
-	argparser.add_argument("--lrStep", type=int, default=4, help="Step Learning Rate after n epochs")
+	argparser.add_argument("--epochs", type=int, default=3, help="Number of epochs")
+	argparser.add_argument("--lrStep", type=int, default=1, help="Step Learning Rate after n epochs")
 	argparser.add_argument("--enrichFactor", type=int, default=32,
 							help="Factor to increase drawing rate of notary documents")
 	argparser.add_argument("--swapSign", action='store_true', default=False, help="Augment by swapping notary sign")
@@ -209,6 +209,7 @@ def main():
 	loss_ax.set_ylabel("Losses")
 	loss_ax.set_ylim([0, 1])
 	loss_ax.set_title("Loss-Curves of %s" % model_name)
+	loss_ax.legend(loc=3)
 
 	training_x_data = []
 	validation_x_data = []
@@ -224,6 +225,25 @@ def main():
 	# Store losses
 	train_losses, validation_losses = [], []
 
+	# Pre training validation
+	validation_loss = 0
+	model_network.eval()
+	with torch.no_grad():
+		for inputs, labels, image_paths in validation_loader:
+			inputs, labels = inputs.to(device), labels.to(device)
+			logps = model_network.forward(inputs)
+			batch_loss = validation_criterion(logps, labels)
+			validation_loss += batch_loss.item()
+
+	validation_x_data.append(0)
+	validation_losses.append(validation_loss)
+	validation_loss_curve.set_xdata(validation_x_data)
+	validation_loss_curve.set_ydata(numpy.array(validation_losses))
+
+	__LOGGER__.info(f"Pre training check\n"
+		f"Test loss: {validation_loss / len(validation_loader):.3f}.. ")
+
+
 	t0 = time.time()
 	__LOGGER__.info(
 		"##########################\n"
@@ -236,7 +256,6 @@ def main():
 	running_loss = 0
 	model_network.train()
 	t1 = time.time()
-
 	for epoch in range(epochs):
 
 		# Training
@@ -251,10 +270,11 @@ def main():
 			loss.backward()
 			optimizer.step()
 
-			running_loss += loss.detach().item()
+			current_loss = loss.detach().item()
+			running_loss += current_loss
 
 			# Update the losses
-			train_losses.append(running_loss / len(training_loader))
+			train_losses.append(current_loss)
 			training_x_data.append(iteration_count)
 			train_loss_curve.set_xdata(training_x_data)
 			train_loss_curve.set_ydata(numpy.array(train_losses))
@@ -297,7 +317,7 @@ def main():
 					# Update the plots
 					validation_x_data.append(iteration_count)
 					validation_losses.append(validation_loss / len(validation_loader))
-					validation_loss_curve.set_xdata(range(len(validation_losses)))
+					validation_loss_curve.set_xdata(validation_x_data)
 					validation_loss_curve.set_ydata(numpy.array(validation_losses))
 
 					loss_ax.set_xlim((0, iteration_count - 1))
