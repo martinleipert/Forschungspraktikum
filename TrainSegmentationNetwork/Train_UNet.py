@@ -65,7 +65,7 @@ def main():
     arg_parser.add_argument("--epochs", type=int, default=30)
     arg_parser.add_argument("--lrStep", type=int, default=10)
     arg_parser.add_argument("--regionSelect", default=False, action='store_true',
-                            default="Use the region select to counter class imbalance")
+                            help="Use the region select to counter class imbalance")
 
     parsed_args = arg_parser.parse_args()
 
