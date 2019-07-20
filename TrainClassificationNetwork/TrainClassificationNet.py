@@ -32,9 +32,9 @@ SAVE_EVERY_ITERATION = 200
 # endregion
 
 MODEL_PATHS = {
-	'RESNET_18': 'resnet18_notarsurkunden.pth',
-	'RESNET_50': 'resnet50_notarsurkunden.pth',
-	'DENSETNET_121': 'densenet121_notarsurkunden.pth',
+	'RESNET_18': 'resnet18_notarsurkunden',
+	'RESNET_50': 'resnet50_notarsurkunden',
+	'DENSETNET_121': 'densenet121_notarsurkunden',
 }
 
 """
@@ -62,8 +62,9 @@ def main():
 	argparser.add_argument("--trainFresh", default=False, action='store_true',
 							help="Train a fresh model. If False the last state of the previous is loaded")
 	argparser.add_argument("-LR", "--learningRate", type=float, default=1e-3, help="Initial Learning Rate")
-	argparser.add_argument("--epochs", type=int, default=3, help="Number of epochs")
-	argparser.add_argument("--lrStep", type=int, default=1, help="Step Learning Rate after n epochs")
+	argparser.add_argument("--epochs", type=int, default=2, help="Number of epochs")
+	argparser.add_argument("--lrStep", type=int, default=400, help="Step Learning Rate after n iterations")
+	argparser.add_argument("--breakIterations", type=int, default=1600, help="Break after n iterations")
 	argparser.add_argument("--enrichFactor", type=int, default=32,
 							help="Factor to increase drawing rate of notary documents")
 	argparser.add_argument("--swapSign", action='store_true', default=False, help="Augment by swapping notary sign")
@@ -78,10 +79,11 @@ def main():
 	epochs = args.epochs
 	lr_step_size = args.lrStep
 	loss_fkt = args.LOSS_FKT.upper()
-	model_path = "%s_%s_%s" % (chosen_set, MODEL_PATHS[model_name], loss_fkt)
+	model_path = "%s_%s_%s.pth" % (chosen_set, MODEL_PATHS[model_name], loss_fkt)
 	augmentation_fct = args.AUGMENTATION.upper()
 	drawing_factor = args.enrichFactor
 	swap_sign = args.swapSign
+	break_iterations = args.breakIterations
 
 	training_set = f"{SET_ROOT}/{chosen_set}/traindata.txt"
 	validation_set = f"{SET_ROOT}/{chosen_set}/validationdata.txt"
@@ -105,7 +107,8 @@ def main():
 					f"Loss function: {loss_fkt}\n"
 					f"Augmentation function: {augmentation_fct}\n"
 					f"Swap sign: {swap_sign}\n"
-					f"Drawing factor: {drawing_factor}")
+					f"Drawing factor: {drawing_factor}\n"
+					f"Break after iterations: {break_iterations}")
 
 	"""
 	Prepare the data
@@ -207,15 +210,15 @@ def main():
 	loss_ax = loss_fig.add_subplot(111)
 	loss_ax.set_xlabel("Iterations")
 	loss_ax.set_ylabel("Losses")
-	loss_ax.set_ylim([0, 1])
+	loss_ax.set_ylim([0, 2])
 	loss_ax.set_title("Loss-Curves of %s" % model_name)
-	loss_ax.legend(loc=1)
 
 	training_x_data = []
 	validation_x_data = []
 
-	train_loss_curve, = loss_ax.plot(training_x_data, [], 'b-', label="Training Loss", linewidth=2)
-	validation_loss_curve, = loss_ax.plot(validation_x_data, [], 'r-', label="Validation Loss", linewidth=2)
+	train_loss_curve, = loss_ax.plot(training_x_data, [], 'b-', label="Training Loss", linewidth=1)
+	validation_loss_curve, = loss_ax.plot(validation_x_data, [], 'r-', label="Validation Loss", linewidth=1)
+	loss_ax.legend(loc=1)
 	loss_fig.show()
 	pyplot.pause(0.05)
 
@@ -257,10 +260,10 @@ def main():
 	model_network.train()
 	t1 = time.time()
 	for epoch in range(epochs):
-
 		# Training
 		for inputs, labels, image_paths in training_loader:
 			iteration_count += 1
+			exp_lr_scheduler.step()
 
 			inputs, labels = inputs.to(device), labels.to(device)
 
@@ -330,6 +333,7 @@ def main():
 					__LOGGER__.info(
 						f" {t2 - t0}s total - {t2 - t1}s epoch - Epoch {epoch + 1}/{epochs} - "
 						f"Iteration {iteration_count}\n"
+						f"Current learning Rate {exp_lr_scheduler.get_lr()}\n"
 						f"Train loss: {running_loss / PRINT_EVERY_ITERATIONS:.3f}.. "
 						f"Test loss: {validation_loss / len(validation_loader):.3f}.. "
 						f"Test accuracy: {accuracy / len(validation_loader):.3f}")
@@ -340,7 +344,7 @@ def main():
 									"Notary     | %8i             | %8i\n" % (confusion[1, 1], confusion[1, 0]))
 
 				t1 = time.time()
-				exp_lr_scheduler.step()
+
 
 				model_network.train()
 				running_loss = 0
@@ -349,10 +353,16 @@ def main():
 			if iteration_count % SAVE_EVERY_ITERATION == (SAVE_EVERY_ITERATION - 1):
 				torch.save(model_network.state_dict(), "TrainedModels/%s" % model_path)
 
+			# Break if sufficient iterations
+			if (iteration_count % break_iterations) == 0:
+				break
+		if (iteration_count % break_iterations) == 0:
+			break
+
 	# SAVE Model in the end
 	torch.save(model_network.state_dict(), "TrainedModels/%s" % model_path)
 
-	with open(os.path.join(f"TrainingLogs/Loss_Curve_{model_name}_{chosen_set}.txt")) as store_file:
+	with open(os.path.join(f"TrainingLogs/Loss_Curve_{model_name}_{chosen_set}.txt"), "w") as store_file:
 
 		store_file.write("Training Iterations:\n")
 		store_file.write(training_x_data.__str__() + "\n")

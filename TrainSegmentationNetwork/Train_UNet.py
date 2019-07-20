@@ -160,7 +160,7 @@ def main():
     loss_ax = loss_fig.add_subplot(111)
     loss_ax.set_xlabel("Epochs")
     loss_ax.set_ylabel("")
-    loss_ax.set_ylim([0, 1])
+    loss_ax.set_ylim([0, 2])
     loss_ax.set_title("Loss-Curves of %s" % model_name)
     loss_ax.legend(loc=1)
 
