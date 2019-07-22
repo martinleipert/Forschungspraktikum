@@ -32,13 +32,15 @@ class SymbolSwapper:
 		org_xml = self.get_xml(org_doc)
 		swap_doc, swap_xml = self.get_random_file(org_doc)
 
-		org_image = Image.open(org_doc)
+		im = Image.open(org_doc)
 		for i in range(3):
 			try:
-				org_image.load()
+				im.load()
 			except Exception as e:
 				pass
-		org_image = org_image.convert('RGB')
+		org_image = im.convert('RGB')
+
+		del im
 
 		# Not every notary document contains a signature
 		elem = None
@@ -54,14 +56,15 @@ class SymbolSwapper:
 			if elem is None:
 				swap_doc, swap_xml = self.get_random_file(org_doc)
 
-		swap_image = Image.open(swap_doc)
+		im = Image.open(swap_doc)
 		for i in range(3):
 			try:
-				swap_image.load()
+				im.load()
 			except Exception as e:
 				pass
 
-		swap_image = swap_image.convert('RGB')
+		swap_image = im.convert('RGB')
+		del im
 
 		points = elem.find('{' + SCHEMA + '}' + 'Coords').get('points')
 		fix_pts = tuple(map(lambda x: tuple(map(int, x.split(','))), points.split(' ')))

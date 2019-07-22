@@ -11,6 +11,7 @@ import re
 import random
 from Augmentations.Augmentations import *
 from TrainClassificationNetwork.SwapAddNotarySymbol import SymbolSwapper
+import torch
 
 Image.LOAD_TRUNCATED_IMAGES = True
 
@@ -32,8 +33,13 @@ def augmentation_loader(path, label, augmentation=None, swapper=None):
 		image = image.convert('RGB')
 
 	if augmentation:
+		# Shrink the image for augmentation -> Save computation time
+		min_dim = min(image.size)
+		thumb_size = image.size * (512.0 / min_dim)
+		image.thumbnail(thumb_size, Image.ANTIALIAS)
 		try:
-			image = augmentation(image=image)["image"]
+			augmented_image = augmentation(image=image)
+			image = augmented_image["image"]
 		except Exception as e:
 			pass
 
@@ -41,7 +47,8 @@ def augmentation_loader(path, label, augmentation=None, swapper=None):
 	trans2 = transforms.CenterCrop(224)
 	trans3 = transforms.ToTensor()
 	image = trans3(trans2(trans1(image)))
-	return image
+
+	return image.detach()
 
 
 # Read the previously defined filelist (from Define Sets)
@@ -67,7 +74,7 @@ def default_flist_reader(flist):
 
 class ImageFileList(data.Dataset):
 
-	def __init__(self, root, flist, transform=None, target_transform=None, augmentation=weak_augmentation(),
+	def __init__(self, root, flist, transform=None, augmentation=weak_augmentation,
 				flist_reader=default_flist_reader, loader=augmentation_loader, enrich_factor=1, swap=False,
 				swap_probability=0.9):
 		self.enrich_factor = enrich_factor
@@ -79,9 +86,11 @@ class ImageFileList(data.Dataset):
 		else:
 			self.im_list = ImageFileList.augment_imlist(self.im_list, enrich_factor)
 		self.transform = transform
-		self.target_transform = target_transform
 		self.loader = loader
-		self.augmentation = augmentation
+		if augmentation is not None:
+			self.augmentation = augmentation()
+		else:
+			self.augmentation = None
 
 		self.swap_probability = swap_probability
 		self.swapper = None
@@ -93,8 +102,6 @@ class ImageFileList(data.Dataset):
 		img = self.loader(os.path.join(self.root, impath), target, augmentation=self.augmentation, swapper=self.swapper)
 		if self.transform is not None:
 			img = self.transform(img)
-		if self.target_transform is not None:
-			target = self.target_transform(target)
 
 		return img, target, impath
 
