@@ -10,6 +10,7 @@ from UNet.FocalLoss import FocalLoss2d
 import logging
 from argparse import ArgumentParser
 from Augmentations.Augmentations import weak_augmentation, moderate_augmentation, heavy_augmentation
+import os
 
 import sys
 from matplotlib import pyplot
@@ -56,14 +57,18 @@ __LOGGER__.addHandler(cmd_handler)
 
 def main():
     arg_parser = ArgumentParser("Train a UNet with the parameters given by the Parser")
+    arg_parser.add_argument("SETTING_NAME", help="Name of the setting - used for storage")
     arg_parser.add_argument("SET_NAME", help="Name of the set used for training")
     arg_parser.add_argument("BCE", type=float, help="Weight of the bce loss function")
     arg_parser.add_argument("DICE", type=float, help="Weight of the dice loss function")
     arg_parser.add_argument("FOCAL", type=float, help="Weight of the focal loss function")
-    arg_parser.add_argument("AUGMENTATION", type=str, help="Selected Augmentation: 'WEAK', 'MODERATE', 'HEAVY'")
+    arg_parser.add_argument("AUGMENTATION", type=str, help="Selected Augmentation: 'NONE', 'WEAK', 'MODERATE', 'HEAVY'")
     arg_parser.add_argument("--learningRate", type=float, default=1e-3)
-    arg_parser.add_argument("--epochs", type=int, default=30)
+    arg_parser.add_argument("--epochs", type=int, default=60)
     arg_parser.add_argument("--lrStep", type=int, default=10)
+    arg_parser.add_argument("--lrGamma", type=float, default=0.5)
+    arg_parser.add_argument("--trainFresh", action="store_true", default=False, help="Train a new model?")
+
     arg_parser.add_argument("--regionSelect", default=False, action='store_true',
                             help="Use the region select to counter class imbalance")
 
@@ -73,14 +78,16 @@ def main():
 
     train_fresh = False
 
+    setting_name = parsed_args.SETTING_NAME
     set_name = parsed_args.SET_NAME
-    model_name = "unet_%s_training.pth" % set_name
+    model_name = "%s.pth" % setting_name
 
     learning_rate = parsed_args.learningRate
     num_epochs = parsed_args.epochs
     # Step size of Learning rate decay
     lr_step_size = parsed_args.lrStep
     region_select = parsed_args.regionSelect
+    lr_gamma = parsed_args.lrGamma
 
     train_losses_weighting = {
         "BCE_LOSS": parsed_args.BCE,
@@ -91,18 +98,19 @@ def main():
     file_list_training = f"%s/%s/training.txt" % (DIR_ROOT, set_name)
     file_list_validation = f"%s/%s/validation.txt" % (DIR_ROOT, set_name)
 
-    __LOG_PATH = f"TrainingLogs/Training_Log_{model_name}_{set_name}.txt"
+    __LOG_PATH = f"TrainingLogs/Training_Log_{setting_name}.txt"
     file_handler = logging.FileHandler(__LOG_PATH)
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(formatter)
     __LOGGER__.addHandler(file_handler)
 
-    __LOGGER__.info(f"Start Training of {model_name}\n"
+    __LOGGER__.info(f"Start Training of {setting_name}\n"
                     f"Training on {set_name}\n"
                     f"Learning Rate: {learning_rate}\n"
                     f"Batch size: {BATCH_SIZE}\n"
                     f"Epochs: {num_epochs}\n"
                     f"Learning Rate Step Size: {lr_step_size}\n"
+                    f"Learning Rate Gamma: {lr_gamma}\n"
                     f"Loss composition: {train_losses_weighting}\n"
                     f"Augmentation function: {augmentation_fct}\n"
                     f"Region select: {region_select}\n")
@@ -116,13 +124,15 @@ def main():
         augmentation_fct = moderate_augmentation
     elif augmentation_fct == "HEAVY":
         augmentation_fct = heavy_augmentation
+    elif augmentation_fct == "NONE":
+        augmentation_fct = None
 
     torch.cuda.empty_cache()
 
     # Load with self written FIle loader
     training_data = UNetDatasetDynamicMask(file_list_training, region_select=region_select,
                                            augmentation=augmentation_fct)
-    validation_data = UNetDatasetDynamicMask(file_list_validation, region_select=False)
+    validation_data = UNetDatasetDynamicMask(file_list_validation, augmentation=None, region_select=False)
 
     # Define the DataLoader
     train_loader = torch.utils.data.DataLoader(training_data, batch_size=BATCH_SIZE)
@@ -144,13 +154,16 @@ def main():
     #        param.requires_grad = False
 
     optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate)
-    exp_lr_scheduler = lr_scheduler.StepLR(optimizer, step_size=lr_step_size, gamma=0.5)
+    exp_lr_scheduler = lr_scheduler.StepLR(optimizer, step_size=lr_step_size, gamma=lr_gamma)
 
     """
     Here  it  could be separated into a method
     """
     train_losses = []
     validation_losses = []
+    val_dice_losses = []
+    val_bce_losses = []
+    val_focal_losses = []
 
     """
     Plotting
@@ -161,42 +174,22 @@ def main():
     loss_ax.set_xlabel("Epochs")
     loss_ax.set_ylabel("")
     loss_ax.set_ylim([0, 2])
-    loss_ax.set_title("Loss-Curves of %s" % model_name)
+    loss_ax.set_title("Loss-Curves of %s" % setting_name)
+    train_loss_curve, = loss_ax.plot([0], [0], 'b-', label="Training Loss")
+    validation_loss_curve, = loss_ax.plot([0], [0], 'r-', label="Validation Loss")
+    validation_bce_curve, = loss_ax.plot([0], [0], 'r--', label="Validation BCE Loss")
+    validation_dice_curve, = loss_ax.plot([0], [0], 'r:', label="Validation DICE Loss")
+    validation_focal_curve, = loss_ax.plot([0], [0], 'r-.', label="Validation FOCAL Loss")
     loss_ax.legend(loc=1)
-
-    train_loss_curve, = loss_ax.plot([], 'b-', label="Training Loss")
-    validation_loss_curve, = loss_ax.plot([], 'r-', label="Validation Loss")
-    loss_fig.show()
-    pyplot.pause(0.05)
 
     """
     Initial loss 
     """
-    metrics = defaultdict(float)
-    epoch_samples = 0
+    validation_x_data = []
+    training_x_data = []
 
-    with torch.no_grad():
-        for images, masks, image_paths in validation_loader:
-            images = images.to(device)
-            masks = masks.to(device)
-
-            optimizer.zero_grad()
-
-            # forward
-            # track history if only in train
-            outputs = model(images)
-
-            calc_loss(outputs, masks, metrics, VAL_LOSSES_WEIGHTING).detach()
-
-            # statistics
-            epoch_samples += images.size(0)
-
-    print_metrics(metrics, epoch_samples, 'validation')
-
-    val_loss = metrics['loss']
-    validation_losses.append(val_loss)
-
-    __LOGGER__.info(f"Initial validation loss {val_loss}\n")
+    loss_fig.show()
+    pyplot.pause(0.05)
 
     start_time = time.time()
 
@@ -204,6 +197,9 @@ def main():
 
         # Start the training phase of an epoch
         epoch_start = time.time()
+
+        training_x_data.append(epoch+1)
+        validation_x_data.append(epoch+1)
 
         __LOGGER__.info(f'\n{epoch_start - start_time} s elapsed\nEpoch {epoch + 1 }/{num_epochs}')
         __LOGGER__.info('-' * 10)
@@ -214,6 +210,7 @@ def main():
         model.train()
         epoch_samples = 0
 
+        metrics_train = defaultdict(float)
         __LOGGER__.info("===== Training =====")
         # Image-wise Training
         for images, masks, image_paths in train_loader:
@@ -228,7 +225,7 @@ def main():
             # track history if only in train
             outputs = model.forward(images)
 
-            loss = calc_loss(outputs, masks, metrics, train_losses_weighting)
+            loss = calc_loss(outputs, masks, metrics_train, train_losses_weighting)
 
             # backward + optimize only if in training phase
             loss.backward()
@@ -237,16 +234,16 @@ def main():
             # statistics
             epoch_samples += images.size(0)
 
-        print_metrics(metrics, epoch_samples, 'train')
+        print_metrics(metrics_train, epoch_samples, 'train')
 
-        train_loss = metrics['loss']
+        train_loss = metrics_train['loss'] / epoch_samples
         train_losses.append(train_loss)
-        train_loss_curve.set_xdata(range(len(train_losses)))
+        train_loss_curve.set_xdata(range(1, len(train_losses)+1))
         train_loss_curve.set_ydata(np.array(train_losses))
 
         # Validation phase
         model.eval()
-        metrics = defaultdict(float)
+        metrics_val = defaultdict(float)
         epoch_samples = 0
         __LOGGER__.info("===== Validation =====")
 
@@ -261,26 +258,62 @@ def main():
                 # track history if only in train
                 outputs = model(images)
 
-                calc_loss(outputs, masks, metrics, VAL_LOSSES_WEIGHTING).detach()
+                calc_loss(outputs, masks, metrics_val, VAL_LOSSES_WEIGHTING).detach()
 
                 # statistics
                 epoch_samples += images.size(0)
 
-        print_metrics(metrics, epoch_samples, 'validation')
+        print_metrics(metrics_val, epoch_samples, 'validation')
 
-        val_loss = metrics['loss']
+        val_loss = metrics_val['loss'] / epoch_samples
         validation_losses.append(val_loss)
-        validation_loss_curve.set_xdata(range(len(validation_losses)))
+
+        val_bce_loss = metrics_val['bce'] / epoch_samples
+        val_bce_losses.append(val_bce_loss)
+
+        val_dice_loss = metrics_val['dice'] / epoch_samples
+        val_dice_losses.append(val_dice_loss)
+
+        val_focal_loss = metrics_val['focal'] / epoch_samples
+        val_focal_losses.append(val_focal_loss)
+
+        validation_loss_curve.set_xdata(range(1, len(validation_losses)+1))
         validation_loss_curve.set_ydata(np.array(validation_losses))
-        loss_ax.set_xlim((-1, len(validation_losses)))
+        validation_bce_curve.set_xdata(range(1, len(validation_losses)+1))
+        validation_bce_curve.set_ydata(np.array(val_bce_losses))
+        validation_dice_curve.set_xdata(range(1, len(validation_losses)+1))
+        validation_dice_curve.set_ydata(np.array(val_dice_losses))
+        validation_focal_curve.set_xdata(range(1, len(validation_losses)+1))
+        validation_focal_curve.set_ydata(np.array(val_focal_losses))
+        loss_ax.set_xlim((-1, len(validation_losses)+2))
         pyplot.pause(0.05)
-        loss_fig.savefig("TrainingLogs/%s_%s.png" % (model_name, set_name), dpi=200)
+        loss_fig.savefig("TrainingLogs/%s.png" % setting_name, dpi=200)
 
         if epoch % 5 == 4:
             torch.save(model.state_dict(), "TrainedModels/%s" % model_name)
 
     torch.save(model.state_dict(), "TrainedModels/%s" % model_name)
 
+    with open(os.path.join(f"TrainingLogs/{setting_name}_Loss_Curve.txt"), "w") as store_file:
+
+        store_file.write("Training Loss:\n")
+        store_file.write(train_losses.__str__() + "\n")
+
+        store_file.write("\n")
+        store_file.write("Validation Loss:\n")
+        store_file.write(validation_losses.__str__() + "\n")
+
+        store_file.write("\n")
+        store_file.write("Validation BCE Loss:\n")
+        store_file.write(val_bce_losses.__str__() + "\n")
+
+        store_file.write("\n")
+        store_file.write("Validation Dice Loss:\n")
+        store_file.write(val_dice_losses.__str__() + "\n")
+
+        store_file.write("\n")
+        store_file.write("Validation Focal Loss:\n")
+        store_file.write(val_focal_losses.__str__() + "\n")
     pass
 
 
@@ -298,7 +331,7 @@ def calc_loss(pred, target, metrics, losses_weighting):
     focal_loss, bce_loss, dice = (0, 0, 0)
 
     if focal_weight > 0:
-        focal_loss = FocalLoss2d(gamma=2, weight=WEIGHTS).forward(pred, target)
+        focal_loss = FocalLoss2d(gamma=0.5, weight=WEIGHTS, size_average=True).forward(pred, target)
         metrics['focal'] += focal_loss.data.cpu().detach().numpy() * target.size(0)
 
     if dice_weight > 0:

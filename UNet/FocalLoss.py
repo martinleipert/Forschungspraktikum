@@ -31,30 +31,33 @@ class FocalLoss2d(nn.Module):
 			self.weight = None
 
 	def forward(self, im_input, target):
-		if im_input.dim()>2:
+
+		if im_input.dim() > 2:
 			im_input = im_input.contiguous().view(im_input.size(0), im_input.size(1), -1)
 			im_input = im_input.transpose(1,2)
 			im_input = im_input.contiguous().view(-1, im_input.size(2)).squeeze()
-		if target.dim()==4:
+		if target.dim() == 4:
 			target = target.contiguous().view(target.size(0), target.size(1), -1)
 			target = target.transpose(1,2)
 			target = target.contiguous().view(-1, target.size(2)).squeeze()
-		elif target.dim()==3:
+		elif target.dim() == 3:
 			target = target.view(-1)
 		else:
 			target = target.view(-1, 1)
 
+		# Normalized probabilities
 		out = torch.sqrt(im_input.pow(2).sum(1))
 		p = im_input / torch.t(out.repeat((4, 1)))
 
 		# compute the negative likelyhood
 		ones = torch.ones_like(im_input)
 		pt_c = ones - target
-		pt = ones + target*p - pt_c*p
+
+		pt = target*p + pt_c*(1-p)
 		log_pt = torch.log(pt)
 
 		# compute the loss
-		loss = -((1-pt)**self.gamma) * log_pt
+		loss = -((1.0-pt).pow(self.gamma)) * log_pt
 
 		loss[torch.isnan(loss)] = 0
 		loss[torch.isinf(loss)] = 0
@@ -68,6 +71,8 @@ class FocalLoss2d(nn.Module):
 
 			tensor_weights = torch.where(target == 1, repeated_weight, tensor_weights)
 			loss = tensor_weights * loss
+
+		loss = loss.sum(dim=1)
 
 		# averaging (or not) loss
 		if self.size_average:

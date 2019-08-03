@@ -28,7 +28,7 @@ def weak_augmentation():
 
 	# Light rotation and shifts on the scanner occur,
 	# As the documents are of different size, scale is sth. which frequently occurs in the set
-	affine = ShiftScaleRotate(shift_limit=0.15, scale_limit=0.25, rotate_limit=5, p=0.7)
+	affine = ShiftScaleRotate(shift_limit=0.1, scale_limit=0.1, rotate_limit=5, p=0.4)
 
 	# Few distorsion occurs due to not perfectly planar documents
 	distortion = OneOf([
@@ -37,15 +37,15 @@ def weak_augmentation():
 		], p=0.15)
 
 	# Sometimes shadows occur in the image due to not perfect plainness
-	effects = RandomShadow(p=0.25)
+	effects = RandomShadow(p=0.2)
 
 	# Contrast and lighting changes are frequent
-	brightness_contrast = RandomBrightnessContrast(brightness_limit=0.4, contrast_limit=0.2, p=0.3)
+	brightness_contrast = RandomBrightnessContrast(brightness_limit=0.3, contrast_limit=0.15, p=0.4)
 
 	# HSV varies a little over the documents
 	color = OneOf([
-		HueSaturationValue(hue_shift_limit=15, sat_shift_limit=20, val_shift_limit=15, p=0.5),
-		RGBShift(r_shift_limit=15, g_shift_limit=15, b_shift_limit=15, p=0.5)],
+		HueSaturationValue(hue_shift_limit=10, sat_shift_limit=10, val_shift_limit=10, p=0.5),
+		RGBShift(r_shift_limit=10, g_shift_limit=10, b_shift_limit=10, p=0.5)],
 		p=0.4)
 
 	augmentation = Compose([flip, affine, distortion, brightness_contrast, distortion, color, effects], p=1)
@@ -61,23 +61,23 @@ def moderate_augmentation():
 	# -> Improves generalization
 	# -> However not that relevant augmentation
 	flip = OneOf([
-		Flip(p=0.3),
-		HorizontalFlip(p=0.3),
-		Transpose(p=0.4)
+		Flip(p=0.2),
+		HorizontalFlip(p=0.2),
+		RandomRotate90(p=0.6)
 	],
 	p=0.2)
 
 	# Generalization -> But large rotations or shiftt's dont make sense as documents are scanned
-	affine = ShiftScaleRotate(shift_limit=0.15, scale_limit=0.3, rotate_limit=7, p=0.7)
+	affine = ShiftScaleRotate(shift_limit=0.15, scale_limit=0.15, rotate_limit=7, p=0.7)
 
 	noise_blur = OneOf([
 			# Gaussian Noise -> Robustness
-			GaussNoise(var_limit=(10., 50.), p=0.2),
+			GaussNoise(var_limit=(5., 25.), p=0.2),
 			# Blur -> Robustness
-			MotionBlur(blur_limit=5, p=0.2),
-			MedianBlur(blur_limit=5, p=0.1),
-			Blur(blur_limit=7, p=0.1),
-			GaussianBlur(blur_limit=7, p=0.4)
+			MotionBlur(blur_limit=3, p=0.2),
+			MedianBlur(blur_limit=3, p=0.1),
+			Blur(blur_limit=5, p=0.1),
+			GaussianBlur(blur_limit=5, p=0.4)
 		], p=0.5)
 
 	distortion = OneOf([
@@ -94,7 +94,7 @@ def moderate_augmentation():
 	color = OneOf([
 		# Histogram equalization
 		CLAHE(clip_limit=3, p=0.1),
-		HueSaturationValue(hue_shift_limit=15, sat_shift_limit=20, val_shift_limit=15, p=0.4),
+		HueSaturationValue(hue_shift_limit=15, sat_shift_limit=15, val_shift_limit=15, p=0.4),
 		RGBShift(r_shift_limit=20, g_shift_limit=20, b_shift_limit=20, p=0.4),
 		ToGray(p=0.1)
 	])
@@ -112,23 +112,23 @@ def heavy_augmentation():
 	# -> Improves generalization
 	# -> However not that relevant augmentation
 	flip = OneOf([
-		Flip(p=0.3),
-		HorizontalFlip(p=0.3),
-		Transpose(p=0.4)
+		Flip(p=0.2),
+		HorizontalFlip(p=0.2),
+		RandomRotate90(p=0.6)
 	],
-	p=0.2)
+	p=0.25)
 
 	# Generalization -> But large rotations or shiftt's dont make sense as documents are scanned
-	affine = ShiftScaleRotate(shift_limit=0.2, scale_limit=0.3, rotate_limit=7, p=0.7)
+	affine = ShiftScaleRotate(shift_limit=0.2, scale_limit=0.2, rotate_limit=7, p=0.7)
 
 	noise_blur = OneOf([
 			# Gaussian Noise -> Robustness
-			GaussNoise(var_limit=(10., 70.), p=0.2),
+			GaussNoise(var_limit=(5., 50.), p=0.2),
 			# Blur -> Robustness
-			MotionBlur(blur_limit=10, p=0.2),
-			MedianBlur(blur_limit=10, p=0.1),
-			Blur(blur_limit=20, p=0.1),
-			GaussianBlur(blur_limit=20, p=0.4)
+			MotionBlur(blur_limit=7, p=0.2),
+			MedianBlur(blur_limit=7, p=0.1),
+			Blur(blur_limit=10, p=0.1),
+			GaussianBlur(blur_limit=10, p=0.4)
 		], p=0.5)
 
 	distortion = OneOf([
@@ -139,11 +139,10 @@ def heavy_augmentation():
 
 	# Sometimes shadows occur in the image due to not perfect plainness
 	effects = OneOf([
-		RandomShadow(p=0.3),
+		RandomShadow(p=0.4),
 		JpegCompression(p=0.3),
-		# CoarseDropout(p=0.3),
-		RandomSnow(p=0.4)
-	], p=0.6)
+		RandomSnow(p=0.3)
+	], p=0.5)
 
 	brightness_contrast = RandomBrightnessContrast(brightness_limit=0.25, contrast_limit=0.25, p=0.4)
 
@@ -151,7 +150,7 @@ def heavy_augmentation():
 		# Histogram equalization
 		CLAHE(clip_limit=5, p=0.1),
 		HueSaturationValue(hue_shift_limit=20, sat_shift_limit=30, val_shift_limit=20, p=0.4),
-		RGBShift(r_shift_limit=30, g_shift_limit=30, b_shift_limit=30, p=0.3),
+		RGBShift(r_shift_limit=25, g_shift_limit=25, b_shift_limit=25, p=0.3),
 		ToGray(p=0.1),
 		ChannelShuffle(p=0.1)
 	])

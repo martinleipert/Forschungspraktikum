@@ -12,6 +12,7 @@ import random
 from Augmentations.Augmentations import *
 from TrainClassificationNetwork.SwapAddNotarySymbol import SymbolSwapper
 import torch
+import numpy
 
 Image.LOAD_TRUNCATED_IMAGES = True
 
@@ -28,20 +29,22 @@ def augmentation_loader(path, label, augmentation=None, swapper=None):
 			try:
 				image.load()
 			except Exception as e:
-				pass
+				print(e.__str__())
 
 		image = image.convert('RGB')
 
 	if augmentation:
 		# Shrink the image for augmentation -> Save computation time
-		min_dim = min(image.size)
-		thumb_size = image.size * (512.0 / min_dim)
+		factor = 512.0 / min(image.size)
+		thumb_size = list(map(lambda x: factor*x, image.size))
 		image.thumbnail(thumb_size, Image.ANTIALIAS)
 		try:
+			image = numpy.array(image)
 			augmented_image = augmentation(image=image)
 			image = augmented_image["image"]
+			image = Image.fromarray(image)
 		except Exception as e:
-			pass
+			print(e.__str__())
 
 	trans1 = transforms.Resize(256)
 	trans2 = transforms.CenterCrop(224)
@@ -126,3 +129,20 @@ class ImageFileList(data.Dataset):
 		random.shuffle(enriched_list)
 
 		return enriched_list
+
+
+if __name__ == '__main__':
+	path = "/home/martin/Forschungspraktikum/Testdaten/Notarsurkunden/notarsurkunden_mom/0032_AES_14640607_ReiheD-340_r.jpg"
+	image = augmentation_loader(path, 1, augmentation=weak_augmentation())
+	image = image.cpu().numpy()
+
+	from matplotlib import pyplot
+
+	img = numpy.zeros([224, 224, 3])
+	img[:, :, 0] = image[0, :, :]
+	img[:, :, 1] = image[1, :, :]
+	img[:, :, 2] = image[2, :, :]
+
+	pyplot.imshow(img)
+	pyplot.show()
+	pass

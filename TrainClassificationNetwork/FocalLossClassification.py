@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
+import numpy
 
 """
 Taken from
@@ -18,7 +19,7 @@ class FocalLoss(nn.Module):
 
 		if isinstance(alpha, (float, int)):
 			self.alpha = torch.Tensor([alpha, 1-alpha])
-		if isinstance(alpha, list):
+		if isinstance(alpha, (list, numpy.ndarray)):
 			self.alpha = torch.Tensor(alpha)
 		self.size_average = size_average
 
@@ -35,7 +36,7 @@ class FocalLoss(nn.Module):
 		pt = Variable(logpt.data.exp())
 
 		if self.alpha is not None:
-			if self.alpha.type()!=model_output.data.type():
+			if self.alpha.type() != model_output.data.type():
 				self.alpha = self.alpha.type_as(model_output.data)
 			at = self.alpha.gather(0,target.data.view(-1))
 			logpt = logpt * Variable(at)

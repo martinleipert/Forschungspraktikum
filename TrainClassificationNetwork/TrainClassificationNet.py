@@ -21,27 +21,20 @@ import logging
 # region Fixed Definitions
 SET_ROOT = "/home/martin/Forschungspraktikum/Testdaten/Sets/"
 
-MODES = [5, 5, 0, 1, 2, 3]
-
-BATCH_SIZE_CLASSIFIER_TRAIN = 128
-
-BATCH_SIZE_FULL_TRAIN = 20
-
 # Valdiation BATCH SIze
-BATCH_SIZE_VALIDATION = 256
+BATCH_SIZE_VALIDATION = 160
 
 # Num classes always the same for the problem
 NUM_CLASSES = 2
 
 # Fixed parameters for all models
-PRINT_EVERY_ITERATIONS = 50
-SAVE_EVERY_ITERATION = 200
+
 # endregion
 
 MODEL_PATHS = {
-	'RESNET_18': 'resnet18_notarsurkunden',
-	'RESNET_50': 'resnet50_notarsurkunden',
-	'DENSETNET_121': 'densenet121_notarsurkunden',
+	'RESNET_18': 'resnet18',
+	'RESNET_50': 'resnet50',
+	'DENSENET_121': 'densenet121',
 }
 
 """
@@ -61,11 +54,12 @@ __LOGGER__.addHandler(cmd_handler)
 def main():
 	argparser = ArgumentParser("Flexible Training Script for Notary document detection")
 	argparser.add_argument("MODEL", type=str,
-							help="The chosen model - available: 'RESNET_18', 'RESNET_50', 'DENSETNET_121'")
+							help="The chosen model - available: 'RESNET_18', 'RESNET_50', 'DENSENET_121'")
 	argparser.add_argument("CHOSEN_SET", type=str, help="The directory of the defined set where the set is stored")
 	argparser.add_argument("LOSS_FKT", type=str,
 							help="The chosen Loss function: 'CROSS_ENTROPY', 'NLL', 'FOCAL'")
-	argparser.add_argument("AUGMENTATION", type=str, help="Selected Augmentation: 'WEAK', 'MODERATE', 'HEAVY'")
+	argparser.add_argument("AUGMENTATION", type=str, help="Selected Augmentation: 'NONE', 'WEAK', 'MODERATE', 'HEAVY'")
+	argparser.add_argument("SETTINGNAME", type=str, help="Name of the Stetting (used for storage)")
 	argparser.add_argument("--trainFresh", default=False, action='store_true',
 							help="Train a fresh model. If False the last state of the previous is loaded")
 	argparser.add_argument("-LR", "--learningRate", type=float, default=3e-3, help="Initial Learning Rate")
@@ -76,10 +70,16 @@ def main():
 	argparser.add_argument("--enrichFactor", type=int, default=1,
 							help="Factor to increase drawing rate of notary documents")
 	argparser.add_argument("--swapSign", action='store_true', default=False, help="Augment by swapping notary sign")
-	argparser.add_argument("--autoWeight", action="store_true", default=False, help="Compensate drawing rate by weighting")
+	argparser.add_argument("--autoWeightOff", action="store_false", default=True, help="Compensate drawing rate by weighting")
 	argparser.add_argument("--batchSize", type=int, default=128, help="Batch size for Training")
 	argparser.add_argument("--partialFreeze", action="store_true", default=False,
 							help="Partially freeze the net by a defined function")
+	argparser.add_argument("--loadModel", type=str, default=None,
+							help="Load a Model pretrained on a path")
+	argparser.add_argument("--freezeFeatures", action="store_true", default=False,
+							help="Freeze the feature extracting layers")
+	argparser.add_argument("--saveIterations", type=int, default=200, help="Save every n iterations")
+	argparser.add_argument("--valIterations", type=int, default=50, help="Validate every n iterations")
 
 	args = argparser.parse_args()
 
@@ -89,24 +89,30 @@ def main():
 	chosen_set = args.CHOSEN_SET
 	learning_rate = args.learningRate
 	# epochs = args.epochs
+	setting_name = args.SETTINGNAME
 	lr_step_size = args.lrStep
+
 	loss_fkt = args.LOSS_FKT.upper()
-	model_path = "%s_%s_%s.pth" % (chosen_set, MODEL_PATHS[model_name], loss_fkt)
+	model_path = f"{setting_name}_{MODEL_PATHS[model_name]}"
 	augmentation_fct = args.AUGMENTATION.upper()
 	drawing_factor = args.enrichFactor
 	swap_sign = args.swapSign
 	break_iterations = args.breakIterations
-	autoweight = args.autoWeight
+	auto_weight = args.autoWeightOff
 	batch_size = args.batchSize
 	lr_gamma = args.LRgamma
 	partial_freeze = args.partialFreeze
+	load_path = args.loadModel
+	freeze_features = args.freezeFeatures
+	print_every_iterations = args.valIterations
+	save_every_iteration = args.saveIterations
 
 	training_set = f"{SET_ROOT}/{chosen_set}/traindata.txt"
 	validation_set = f"{SET_ROOT}/{chosen_set}/validationdata.txt"
 	# endregion Parameters
 
 	# Add the text log to the logger
-	__LOG_PATH = f"TrainingLogs/Training_Log_{model_name}_{chosen_set}.txt"
+	__LOG_PATH = f"TrainingLogs/{setting_name}_Training_Log.txt"
 	file_handler = logging.FileHandler(__LOG_PATH)
 	file_handler.setLevel(logging.DEBUG)
 	file_handler.setFormatter(formatter)
@@ -114,7 +120,9 @@ def main():
 
 	pyplot.ion()
 
-	__LOGGER__.info(f"Start Training of {model_name}\n"
+	__LOGGER__.info(f"Setting Name: {setting_name}"
+					f"Start Training of {model_name}\n"
+					f"Train Fresh: {train_fresh}"
 					f"Training on {chosen_set}\n"
 					f"Learning Rate: {learning_rate}\n"
 					f"Batch size: {batch_size}\n"
@@ -126,8 +134,10 @@ def main():
 					f"Swap sign: {swap_sign}\n"
 					f"Drawing factor: {drawing_factor}\n"
 					f"Break after iterations: {break_iterations}\n"
-					f"AutoWeight: {autoweight}\n"
-					f"Partial Freeze: {partial_freeze}\n")
+					f"AutoWeight: {auto_weight}\n"
+					f"Partial Freeze: {partial_freeze}\n"
+					f"Load Model: {load_path}\n"
+					f"Freeze Features: {freeze_features}")
 
 	"""
 	Prepare the data
@@ -173,33 +183,39 @@ def main():
 	# Train on CUDA if possible
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-	if model_name == "DENSETNET_121":
+	if model_name == "DENSENET_121":
 		# Pick the model
 		model_network = models.densenet121(pretrained=train_fresh)
-		for param in model_network.parameters():
-			param.requires_grad = False
+		if freeze_features:
+			for param in model_network.parameters():
+				param.requires_grad = False
 		# -> Map the 1000 outputs to the 2 class problem
 		model_network.classifier = nn.Linear(1024, NUM_CLASSES, nn.Dropout(0.2))
 
 	elif model_name == "RESNET_50":
 		model_network = models.resnet50(pretrained=train_fresh)
-		for param in model_network.parameters():
-			param.requires_grad = False
+		if freeze_features:
+			for param in model_network.parameters():
+				param.requires_grad = False
 		model_network.fc = nn.Sequential(
 			nn.Linear(2048, batch_size), nn.ReLU(), nn.Dropout(0.2), nn.Linear(batch_size, 2),
 			nn.LogSoftmax(dim=1))
 
 	elif model_name == "RESNET_18":
 		model_network = models.resnet18(pretrained=train_fresh)
-		for param in model_network.parameters():
-			param.requires_grad = False
+		if freeze_features:
+			for param in model_network.parameters():
+				param.requires_grad = False
 		model_network.fc = nn.Sequential(
 			nn.Linear(512, batch_size), nn.ReLU(), nn.Dropout(0.2), nn.Linear(batch_size, 2),
 			nn.LogSoftmax(dim=1))
 
 	# Load state dict
 	if not train_fresh:
-		model_network.load_state_dict(torch.load("TrainedModels/%s" % model_path))
+		if not load_path:
+			model_network.load_state_dict(torch.load("TrainedModels/%s" % model_path))
+		else:
+			model_network.load_state_dict(torch.load(load_path))
 
 
 	# for param in model_network.parameters():
@@ -212,17 +228,26 @@ def main():
 	# Cross Entropy -> Quality of probability density function
 	if loss_fkt == "CROSS_ENTROPY":
 		# Two differently parametrized loss functions for training and validation
-		training_criterion = nn.CrossEntropyLoss(weight=torch.from_numpy(numpy.float32(weights)).to(device))
+		if auto_weight is True:
+			training_criterion = nn.CrossEntropyLoss(weight=torch.from_numpy(numpy.float32(weights)).to(device))
+		else:
+			training_criterion = nn.CrossEntropyLoss().to(device)
 		validation_criterion = nn.CrossEntropyLoss().to(device)
 
 	# Negative Log Likelihood
 	elif loss_fkt == "NLL":
-		training_criterion = nn.NLLLoss(weight=torch.from_numpy(numpy.float32(weights)).to(device))
+		if auto_weight is True:
+			training_criterion = nn.NLLLoss(weight=torch.from_numpy(numpy.float32(weights)).to(device))
+		else:
+			training_criterion = nn.NLLLoss().to(device)
 		validation_criterion = nn.NLLLoss().to(device)
 
 	elif loss_fkt == "FOCAL":
-		training_criterion = FocalLoss().to(device)
-		validation_criterion = FocalLoss().to(device)
+		if auto_weight is True:
+			training_criterion = FocalLoss(gamma=2, alpha=weights).to(device)
+		else:
+			training_criterion = FocalLoss(gamma=2, alpha=weights).to(device)
+		validation_criterion = FocalLoss(gamma=2, alpha=weights).to(device)
 
 	# Optimzer
 	lr = learning_rate
@@ -256,7 +281,6 @@ def main():
 	train_losses, validation_losses = [], []
 
 	# Pre training validation
-	"""
 	validation_loss = 0
 	model_network.eval()
 	with torch.no_grad():
@@ -270,10 +294,10 @@ def main():
 	validation_losses.append(validation_loss)
 	validation_loss_curve.set_xdata(validation_x_data)
 	validation_loss_curve.set_ydata(numpy.array(validation_losses))
-
+	
 	__LOGGER__.info(f"Pre training check\n"
 		f"Test loss: {validation_loss / len(validation_loader):.3f}.. ")
-	"""
+
 	t0 = time.time()
 	__LOGGER__.info(
 		"##########################\n"
@@ -296,9 +320,11 @@ def main():
 			iteration_count += 1
 			exp_lr_scheduler.step()
 
+			"""
 			model_network.to("cpu")
 			freeze_network_part(model_network, iteration_count % 4, model_name)
 			model_network.to("cuda")
+			"""
 
 			inputs, labels = inputs.to(device), labels.to(device)
 
@@ -319,9 +345,9 @@ def main():
 
 			__LOGGER__.info(f"Iteration {iteration_count} - Loss {current_loss} !\n")
 
-			if (iteration_count % PRINT_EVERY_ITERATIONS) == 0:
+			if (iteration_count % print_every_iterations) == 0:
 				if partial_freeze:
-					freeze_mode = (iteration_count / PRINT_EVERY_ITERATIONS) % 4
+					freeze_mode = (iteration_count / print_every_iterations) % 4
 					model_network.to("cpu")
 					freeze_network_part(model_network, freeze_mode, model_name)
 					model_network.to("cuda")
@@ -336,11 +362,11 @@ def main():
 					for inputs, labels, image_paths in validation_loader:
 						inputs, labels = inputs.to(device), labels.to(device)
 						logps = model_network.forward(inputs)
+						# ps -> sample predictions
+						ps = torch.exp(logps)
 						batch_loss = validation_criterion(logps, labels)
 						validation_loss += batch_loss.item()
 
-						# ps -> sample predictions
-						ps = torch.exp(logps)
 						top_p, top_class = ps.topk(1, dim=1)
 						equals = top_class == labels.view(*top_class.shape)
 						accuracy += torch.mean(equals.type(torch.FloatTensor)).item()
@@ -366,14 +392,14 @@ def main():
 
 					loss_ax.set_xlim((0, iteration_count - 1))
 					pyplot.pause(0.05)
-					loss_fig.savefig("TrainingLogs/%s_%s.png" % (model_name, chosen_set), dpi=200)
+					loss_fig.savefig("TrainingLogs/%s_Plot.png" % (setting_name), dpi=200)
 
 					# Print the losses
 					__LOGGER__.info(
-						f" {t2 - t0}s total - {t2 - t1}s epoch - Epoch {epoch + 1}/{epochs} - "
+						f" {t2 - t0}s total - {t2 - t1}s epoch - Epoch {epoch + 1} - "
 						f"Iteration {iteration_count}\n"
 						f"Current learning Rate {exp_lr_scheduler.get_lr()}\n"
-						f"Train loss: {running_loss / PRINT_EVERY_ITERATIONS:.3f}.. "
+						f"Train loss: {running_loss / print_every_iterations:.3f}.. "
 						f"Test loss: {validation_loss / len(validation_loader):.3f}.. "
 						f"Test accuracy: {accuracy / len(validation_loader):.3f}")
 
@@ -389,7 +415,7 @@ def main():
 				running_loss = 0
 
 			# Save the net after each 5 epoch
-			if iteration_count % SAVE_EVERY_ITERATION == (SAVE_EVERY_ITERATION - 1):
+			if iteration_count % save_every_iteration == (save_every_iteration - 1):
 				torch.save(model_network.state_dict(), "TrainedModels/%s" % model_path)
 
 			# Break if sufficient iterations
@@ -401,7 +427,7 @@ def main():
 	# SAVE Model in the end
 	torch.save(model_network.state_dict(), "TrainedModels/%s" % model_path)
 
-	with open(os.path.join(f"TrainingLogs/Loss_Curve_{model_name}_{chosen_set}.txt"), "w") as store_file:
+	with open(os.path.join(f"TrainingLogs/{setting_name}_Loss_Curve.txt"), "w") as store_file:
 
 		store_file.write("Training Iterations:\n")
 		store_file.write(training_x_data.__str__() + "\n")

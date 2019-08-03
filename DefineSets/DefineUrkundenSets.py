@@ -26,7 +26,7 @@ NOTARSURKUNDEN_DIR = f"{SET_ROOT}/Transkribierte_Notarsurkunden/notarskurkunden_
 
 def main():
 	arg_parser = ArgumentParser("Define sets for the Training of the Segmentation Network")
-	arg_parser.add_argument("SET_NAME", help="Desired name of the set")
+	arg_parser.add_argument("SET_NAME", type=str, help="Desired name of the set")
 	arg_parser.add_argument("PERCENTAGE_TEST", type=float, help="How many percent to use for testing")
 	arg_parser.add_argument("PERCENTAGE_VALIDATION", type=float,
 							help="How many percent of the remaining are used for validation")
@@ -37,7 +37,7 @@ def main():
 	reduce_set = False if parsed_args.sizeReduction is None else True
 	reduction = parsed_args.sizeReduction
 
-	set_name = arg_parser.SET_NAME
+	set_name = parsed_args.SET_NAME
 
 	# How many data of the set to use for  testing
 	percentage_test = parsed_args.PERCENTAGE_TEST
