@@ -66,7 +66,7 @@ def main():
     arg_parser.add_argument("--learningRate", type=float, default=1e-3)
     arg_parser.add_argument("--epochs", type=int, default=60)
     arg_parser.add_argument("--lrStep", type=int, default=10)
-    arg_parser.add_argument("--lrGamma", type=float, default=0.5)
+    arg_parser.add_argument("--lrGamma", type=float, default=0.3)
     arg_parser.add_argument("--trainFresh", action="store_true", default=False, help="Train a new model?")
 
     arg_parser.add_argument("--regionSelect", default=False, action='store_true',
@@ -173,7 +173,7 @@ def main():
     loss_ax = loss_fig.add_subplot(111)
     loss_ax.set_xlabel("Epochs")
     loss_ax.set_ylabel("")
-    loss_ax.set_ylim([0, 2])
+    loss_ax.set_ylim([0, 1])
     loss_ax.set_title("Loss-Curves of %s" % setting_name)
     train_loss_curve, = loss_ax.plot([0], [0], 'b-', label="Training Loss")
     validation_loss_curve, = loss_ax.plot([0], [0], 'r-', label="Validation Loss")
@@ -320,7 +320,10 @@ def main():
 def calc_loss(pred, target, metrics, losses_weighting):
 
     target = target.double()
-    pred = torch.sigmoid(pred.double())
+
+    pred = pred.double()
+
+    pred_sig = torch.sigmoid(pred.double())
 
     focal_weight = losses_weighting["FOCAL_LOSS"]
     dice_weight = losses_weighting["DICE_LOSS"]
@@ -331,11 +334,11 @@ def calc_loss(pred, target, metrics, losses_weighting):
     focal_loss, bce_loss, dice = (0, 0, 0)
 
     if focal_weight > 0:
-        focal_loss = FocalLoss2d(gamma=0.5, weight=WEIGHTS, size_average=True).forward(pred, target)
+        focal_loss = FocalLoss2d(gamma=1.5, weight=None, size_average=True).forward(pred_sig, target)
         metrics['focal'] += focal_loss.data.cpu().detach().numpy() * target.size(0)
 
     if dice_weight > 0:
-        dice = dice_loss(pred, target)
+        dice = dice_loss(pred_sig, target, weights=WEIGHTS)
         metrics['dice'] += dice.data.cpu().detach().numpy() * target.size(0)
 
     if bce_weight > 0:

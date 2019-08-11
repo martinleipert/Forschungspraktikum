@@ -12,7 +12,6 @@ University of Tokyo Doi Kento
 import numpy
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.autograd import Variable
 
 # I refered https://github.com/c0nn3r/RetinaNet/blob/master/focal_loss.py
@@ -24,13 +23,16 @@ class FocalLoss2d(nn.Module):
 		super(FocalLoss2d, self).__init__()
 
 		self.size_average = size_average
-		self.gamma = gamma
+		self.gamma = numpy.float64(gamma)
 		if weight is not None:
-			self.weight = numpy.float64(weight)
+			self.weight = torch.from_numpy(numpy.float64(weight))
+			self.weight = self.weight.to("cuda")
 		else:
 			self.weight = None
 
 	def forward(self, im_input, target):
+		im_input = im_input.double()
+		target = target.double()
 
 		if im_input.dim() > 2:
 			im_input = im_input.contiguous().view(im_input.size(0), im_input.size(1), -1)
@@ -59,18 +61,20 @@ class FocalLoss2d(nn.Module):
 		# compute the loss
 		loss = -((1.0-pt).pow(self.gamma)) * log_pt
 
-		loss[torch.isnan(loss)] = 0
-		loss[torch.isinf(loss)] = 0
-
 		# Is implemented for four classes
 		if self.weight is not None:
-			weight = Variable(torch.tensor(self.weight)).to('cuda')
+			weight = self.weight
 			# Weight the samples accordingly
 			tensor_weights = torch.zeros_like(loss)
 			repeated_weight = weight.repeat(tensor_weights.size(0), 1)
 
 			tensor_weights = torch.where(target == 1, repeated_weight, tensor_weights)
 			loss = tensor_weights * loss
+
+		loss[torch.isnan(loss)].detach()
+		loss[torch.isnan(loss)] = 0
+		loss[torch.isinf(loss)].detach()
+		loss[torch.isinf(loss)] = 0
 
 		loss = loss.sum(dim=1)
 

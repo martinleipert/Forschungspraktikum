@@ -5,6 +5,7 @@ from UNet.PlotSegmentationResults import plot_result
 from UNet.BatchNormUNet import UNet
 from argparse import ArgumentParser
 import re
+from collections import defaultdict
 """
 Martin Leipert
 martin.leipert@fau.de
@@ -31,7 +32,7 @@ def main():
 
 	model_name = parsed_args.model_name
 
-	set_name = re.search(r"unet_(.*?_set)", model_name).group(1)
+	set_name = "fullset"
 
 	file_list_test = "/home/martin/Forschungspraktikum/Testdaten/Segmentation_Sets/%s/test.txt" % set_name
 
@@ -47,10 +48,12 @@ def main():
 
 	base_name = model_name.rstrip(".pth")
 
-	metrics = {'focal': 0, 'dice': 0, 'bce': 0, 'loss': 0}
+	metrics = defaultdict(float)
+	# {'focal': 0, 'dice': 0, 'bce': 0, 'loss': 0}
 
 	model_network.eval()
 	torch.no_grad()
+
 
 	loss_sum = 0
 	# Testings
@@ -73,7 +76,7 @@ def main():
 		plot_result(outputs, images, base_name, image_paths)
 
 	print(f"Overall loss {loss_sum}")
-	denote_result(base_name, loss_sum)
+	denote_result(base_name, loss_sum, metrics)
 
 
 def denote_result(base_name, loss, metrics):

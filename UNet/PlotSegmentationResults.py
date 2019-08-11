@@ -4,6 +4,7 @@
 import numpy as np
 from matplotlib import pyplot as plt
 import os
+import torch
 
 CLASS_LABELS = {
 	0: "Background",
@@ -16,27 +17,32 @@ CLASS_LABELS = {
 def plot_result(segmented_data_set, images, model_name, file_names, class_labels=CLASS_LABELS, store=True, show=False):
 
 	if store:
-		result_dir = f"Results/{model_name}_results"
+		result_dir = f"Results/{model_name}_result"
 		if not os.path.exists(result_dir):
 			os.mkdir(result_dir)
 
-	segmented_data_set = segmented_data_set.cpu().detach().numpy()
+	numpy_set = torch.sigmoid(segmented_data_set).cpu().detach().numpy()
+	sum_set = np.sum(numpy_set, axis=1)
 
-	dimensions = np.shape(segmented_data_set)
+	for i in range(sum_set.shape[0]):
+		numpy_set[i, :, :, :] = np.divide(numpy_set[i, :, :, :], sum_set[i, :, :])
+		pass
+
+	dimensions = np.shape(numpy_set)
 
 	# Get the images from the batch
 	for im_idx in range(dimensions[0]):
 		file_name = file_names[im_idx]
 		base_name = os.path.basename(file_name)
 
-		segmented_image = segmented_data_set[im_idx, :, :, :]
-		combination_image = np.zeros(np.shape(segmented_image)[1:3])
+		segmented_image = numpy_set[im_idx, :, :, :]
+		combination_image = np.zeros(list(np.shape(segmented_image)[1:3]) + [3])
 
 		org_image = images[im_idx, :, :, :].cpu().detach().numpy()
 		org_image = to_gray_scale(org_image)
 
 		# Create a figure
-		fig = plt.figure(figsize=(15, 7), dpi=200)
+		fig = plt.figure(figsize=(8, 9), dpi=200)
 		fig.suptitle(f"{model_name} Segmentation")
 
 		# Plot the segmented classes
@@ -44,7 +50,10 @@ def plot_result(segmented_data_set, images, model_name, file_names, class_labels
 
 			cls_data = segmented_image[cls_idx, :, :]
 
-			combination_image = np.add(combination_image, cls_data*cls_idx)
+			if cls_idx < 2:
+				combination_image[:, :, cls_idx] = cls_data
+			elif cls_idx == 3:
+				combination_image[:, :, cls_idx-1] = cls_data
 
 			# Add at subsequent positions
 			ax = fig.add_subplot(221 + cls_idx)
@@ -54,12 +63,13 @@ def plot_result(segmented_data_set, images, model_name, file_names, class_labels
 		if show:
 			fig.show()
 		if store:
+			fig.tight_layout()
 			fig.savefig(f"{result_dir}/{base_name}_segmentation.png")
 		fig.clf()
 		plt.close(fig)
 
 		# Create another figure
-		fig = plt.figure(figsize=(15, 7), dpi=200)
+		fig = plt.figure(figsize=(7, 8), dpi=200)
 		ax = fig.add_subplot(111)
 		ax.set_title(f"{model_name} Segmentation")
 
@@ -69,6 +79,7 @@ def plot_result(segmented_data_set, images, model_name, file_names, class_labels
 		if show:
 			fig.show()
 		if store:
+			fig.tight_layout()
 			fig.savefig(f"{result_dir}/{base_name}_segmentation_overlay.png")
 		fig.clf()
 		plt.close(fig)
