@@ -33,10 +33,10 @@ def dice_loss(pred, target, smooth = 1., weights = None):
 
         inter = (l_pred * l_target).sum()
 
-        loss = 1 - ((2. * inter + smooth) / (l_pred.sum() + l_target.sum() + smooth))
+        cur_loss = 1 - ((2. * inter + smooth) / (l_pred.sum() + l_target.sum() + smooth))
         if weights is not None:
-            loss = loss*weights[i]
+            cur_loss = cur_loss*weights[i]
 
-        loss += loss.mean()*(1 / nr_labels)
+        loss += cur_loss*(1 / nr_labels)
     
     return loss
