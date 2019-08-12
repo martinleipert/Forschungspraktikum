@@ -229,6 +229,7 @@ def main():
 
             # backward + optimize only if in training phase
             loss.backward()
+
             optimizer.step()
 
             # statistics
