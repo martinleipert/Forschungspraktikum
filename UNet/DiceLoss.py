@@ -20,7 +20,7 @@ def dice_loss(pred, target, smooth = 1., weights = None):
 
     nr_labels = pred.shape[1]
 
-    loss = torch.zeros(1)
+    loss = torch.zeros(1).double().to("cuda:0")
 
     if weights is not None:
         weights = np.float32(weights)
@@ -35,7 +35,7 @@ def dice_loss(pred, target, smooth = 1., weights = None):
 
         cur_loss = 1 - ((2. * inter + smooth) / (l_pred.sum() + l_target.sum() + smooth))
         if weights is not None:
-            cur_loss = cur_loss*weights[i]
+            cur_loss = cur_loss*weights[i] / weights.sum()
 
         loss += cur_loss*(1 / nr_labels)
     

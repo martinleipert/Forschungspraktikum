@@ -340,7 +340,7 @@ def calc_loss(pred, target, metrics, losses_weighting):
 
     if dice_weight > 0:
         dice = dice_loss(pred_sig, target, weights=WEIGHTS)
-        metrics['dice'] += dice.data.cpu().detach().numpy() * target.size(0)
+        metrics['dice'] += dice.cpu().detach().item() * target.size(0)
 
     if bce_weight > 0:
         bce_loss = F.binary_cross_entropy_with_logits(pred, target)
@@ -348,7 +348,7 @@ def calc_loss(pred, target, metrics, losses_weighting):
 
     sum_loss = (bce_loss * bce_weight + dice * dice_weight + focal_loss * focal_weight) / total_weight
 
-    metrics['loss'] += sum_loss.data.cpu().detach().numpy() * target.size(0)
+    metrics['loss'] += sum_loss.data.cpu().detach().item() * target.size(0)
 
     return sum_loss
 

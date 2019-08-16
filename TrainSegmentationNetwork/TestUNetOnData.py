@@ -6,6 +6,13 @@ from UNet.BatchNormUNet import UNet
 from argparse import ArgumentParser
 import re
 from collections import defaultdict
+import numpy as np
+import skimage
+import skimage.segmentation as seg
+import skimage.filters as filters
+import skimage.morphology as morph
+from PIL import Image
+
 """
 Martin Leipert
 martin.leipert@fau.de
@@ -22,6 +29,7 @@ TEST_LOSSES_WEIGHTING = {
 	"DICE_LOSS": 1,
 	"FOCAL_LOSS": 1
 }
+
 
 
 def main():
@@ -56,6 +64,11 @@ def main():
 
 
 	loss_sum = 0
+
+	confusion = np.zeros([4, 2])
+
+	ground_truth = np.zeros([4])
+
 	# Testings
 	for images, masks, image_paths in test_loader:
 		images = images.to(device)
@@ -73,19 +86,103 @@ def main():
 		# Update the losses
 		loss_sum += loss / len(images)
 
-		plot_result(outputs, images, base_name, image_paths)
+		# plot_result(outputs, images, base_name, images, image_paths)
 
-	print(f"Overall loss {loss_sum}")
-	denote_result(base_name, loss_sum, metrics)
+		this_confusion, gt = get_segmented_area(outputs, masks, images, image_paths)
+		confusion = np.add(confusion, this_confusion)
+		ground_truth = np.add(ground_truth, gt)
+
+	confusion = confusion / len(test_loader.dataset.input_images)
+	ground_truth = ground_truth / len(test_loader.dataset.input_images)
+	print("Ground truth")
+	print(ground_truth)
+
+	print(f"Overall loss {loss_sum.cpu().item()}")
+	denote_result(base_name, loss_sum, metrics, confusion)
 
 
-def denote_result(base_name, loss, metrics):
+def get_segmented_area(prediction, org_mask, raw_images, image_paths):
+
+	prediction = torch.sigmoid(prediction.double())
+	prediction = prediction.cpu().numpy()
+
+	org_mask = org_mask.detach().cpu().numpy()
+	raw_images = raw_images.detach().cpu().numpy()
+
+	class_labels = np.argmax(prediction, axis=1)
+
+	image_size = 224*224
+
+	full_confusion = np.zeros([4, 2])
+	ground_truth = np.zeros(4)
+
+	for i in range(prediction.shape[0]):
+
+		local_mask = org_mask[i, :, :, :]
+		mask_labels = np.argmax(local_mask, axis=0)
+		local_labels = class_labels[i, :, :]
+
+		image = raw_images[i, :, :]
+		raw_im = np.zeros(list(image.shape[1:3]) + [3])
+
+		for i in range(3):
+			raw_im[:, :, i] = image[i, :, :]
+
+		image = Image.fromarray(np.uint8(raw_im*256))
+		image = image.convert("L")
+		thresh = filters.threshold_otsu(np.array(image))
+		text_or_sign = image < thresh
+		background = image > thresh
+
+		confusion = np.zeros([4, 2])
+		for i in range(4):
+			ground_truth[i] += np.where(mask_labels == i, 1, 0).sum(0).sum(0) / image_size
+
+			correct = np.where(np.logical_and(local_labels == i, mask_labels == i), 1, 0).sum(0).sum(0) / image_size
+			false = np.where(np.logical_and(local_labels == i, mask_labels != i), 1, 0).sum(0).sum(0) / image_size
+
+			confusion[i, 0] = correct
+			confusion[i, 1] = false
+
+			pass
+		full_confusion = np.add(full_confusion, confusion)
+
+	"""
+	# Missclassified area:
+	subtraction = new_mask - org_mask
+	subtraction = np.where(subtraction < 0, 0, subtraction)
+	missclassified = subtraction.sum(axis=0).sum(axis=0)
+
+	org_images = []
+
+	for raw_im in raw_images:
+
+		image = Image.open(org_im)
+		image = image.convert("L")
+
+		# Correctly classified area:
+		# Use Otsu thresholding
+
+		image = Image.fromarray(raw_im)
+
+		segmented = filters.threshold_otsu(image)
+		morph.binary_dilation(segmented, out=segmented)
+		org_images.append(segmented)
+		"""
+	return full_confusion, ground_truth
+
+
+def denote_result(base_name, loss, metrics, confusion):
 
 	with open(f"Results/{base_name}_test_result.txt", "w+") as open_file:
 		open_file.write(f"Loss on Test_data{loss}\n")
 		open_file.write(f"BCE Loss on Test_data{metrics['BCE_LOSS']}\n")
 		open_file.write(f"Dice Loss on Test_data{metrics['DICE_LOSS']}\n")
 		open_file.write(f"Focal Loss on Test_data{metrics['FOCAL_LOSS']}\n")
+		open_file.write("\n")
+		open_file.write("----- Confusion: -----\n")
+		for i in range(4):
+			open_file.write("%i: %.5f | %.5f \n" % (i, confusion[i, 0], confusion[i, 1]))
 
 
 if __name__ == '__main__':

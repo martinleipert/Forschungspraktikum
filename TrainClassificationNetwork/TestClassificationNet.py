@@ -19,7 +19,7 @@ Denote missclassifications
 """
 
 
-BATCH_SIZE = 128
+BATCH_SIZE = 32
 NUM_CLASSES = 2
 
 
@@ -30,10 +30,10 @@ def main():
 	parsed_args = arg_parser.parse_args()
 	model_name = parsed_args.model_name
 
-	model_type = re.search("((?:resnet18)|(?:resnet50)|(?:densenet121))", model_name).group(1)
+	model_type = re.search("\d+_((?:resnet18)|(?:resnet50)|(?:densenet121))", model_name.lower()).group(1)
 	model_type = model_type.upper()
 
-	set_name = re.search("^(.*?_set)", model_name).groups(1)
+	set_name = "full_set" # re.search("^(.*?_set)", model_name).groups(1)
 
 	file_list_test = "/home/martin/Forschungspraktikum/Testdaten/Sets/%s/testdata.txt" % set_name
 
@@ -51,7 +51,8 @@ def main():
 	elif model_type == "RESNET50":
 		model_network = models.resnet50()
 		model_network.fc = nn.Sequential(
-			nn.Linear(2048, BATCH_SIZE), nn.ReLU(), nn.Linear(BATCH_SIZE, 2), nn.LogSoftmax(dim=1))
+			nn.Linear(2048, BATCH_SIZE), nn.ReLU(), nn.Dropout(0.2), nn.Linear(BATCH_SIZE, 2),
+			nn.LogSoftmax(dim=1))
 
 	elif model_type == "DENSENET121":
 		# Pick the model
@@ -61,11 +62,7 @@ def main():
 
 	state_dict = torch.load("TrainedModels/%s" % model_name)
 	model_network.load_state_dict(state_dict)
-
-	# model_network.to(device)
-	torch.no_grad()
-
-	base_name = model_name.rstrip(".pth")
+	model_network.to("cuda:0")
 
 	# Loss functions for testing
 	nn_loss_fct = torch.nn.NLLLoss().to(device)
@@ -80,10 +77,13 @@ def main():
 
 	for_label_result_printing = []
 
+	for param in model_network.parameters():
+		param.requires_grad = False
+
+	model_network.eval()
 	# Training
 	for images, labels, image_paths in test_loader:
 
-		model_network.eval()
 		images = images.to(device)
 		labels = labels.to(device)
 		# forward
@@ -112,23 +112,23 @@ def main():
 		# 1,1 = Correctly classified notary documents
 		for i in range(NUM_CLASSES):
 			for j in range(NUM_CLASSES):
-				confusion[i, j] += np.sum(np.logical_and(ref_labels == i, pred_label == j))
+				match = np.logical_and(ref_labels == i, pred_label == j)
+				confusion[i, j] += list(match).count(True)
 
 		# Update the losses
-		loss_sum_nn += batch_loss_nn.item() / len(images)
-		loss_sum_ce += batch_loss_ce.item() / len(images)
+		loss_sum_nn += batch_loss_nn.item() / len(test_loader)
+		loss_sum_ce += batch_loss_ce.item() / len(test_loader)
 
 		del images, labels, logps, ps
 		torch.cuda.empty_cache()
 
 	print(f"Overall loss {loss_sum_nn}")
-	denote_result(base_name, loss_sum_nn, loss_sum_ce, loss_sum_nn, confusion)
+	denote_result(model_name, loss_sum_ce, loss_sum_nn, confusion, for_label_result_printing)
 
 
-def denote_result(base_name, loss_sum, ce_loss, nn_loss, confusion, for_label_result_printing):
+def denote_result(base_name, ce_loss, nn_loss, confusion, for_label_result_printing):
 
 	with open(f"Results/{base_name}_test_result.txt", "w+") as open_file:
-		open_file.write(f"Loss on Test_data: {loss_sum}\n")
 		open_file.write(f"Cross Entropy: {ce_loss}\n")
 		open_file.write(f"NN Loss: {nn_loss}\n")
 		open_file.write("\n")
