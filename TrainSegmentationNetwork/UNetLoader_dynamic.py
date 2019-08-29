@@ -67,13 +67,17 @@ def dynamic_mask_loader(path, augmentation=None, region_select=False, p_region_s
 	root = xml_tree.getroot()
 	ns = '{' + SCHEMA + '}'
 
+	org_im = Image.open(path)
+
 	# Load mask
-	image = Image.open(path)
+	image = Image.open(os.path.join(os.path.dirname(path), "cached", os.path.basename(path)))
 	image.load()
 	image = image.convert('RGB')
 
+	scale = image.size[1] / org_im.size[1]
+
 	# Contruct mask array
-	mask_array = np.int8(np.zeros(list([image.size[1], image.size[0]]) + [len(REGION_TYPES)]))
+	mask_array = np.int8(np.zeros(list([scale*image.size[1], image.size[0]]) + [len(REGION_TYPES)]))
 
 	all_els = []
 
@@ -84,9 +88,10 @@ def dynamic_mask_loader(path, augmentation=None, region_select=False, p_region_s
 		for el in els:
 			points = el.find(ns + 'Coords').get('points')
 			fix_pts = tuple(map(lambda x: tuple(map(int, x.split(','))), points.split(' ')))
+			fix_pts = tuple(map(lambda x: (int(x[0]*scale), int(x[1]*scale)), fix_pts))
 
 			img = Image.new('L', [image.size[0], image.size[1]], 0)
-			ImageDraw.Draw(img).polygon(fix_pts, fill=1, outline=1, )
+			ImageDraw.Draw(img).polygon(fix_pts, fill=1, outline=1)
 			mask = np.array(img)
 
 			mask_array[:, :, value] = np.logical_or(mask, mask_array[:, :, value])

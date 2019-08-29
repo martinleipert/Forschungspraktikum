@@ -23,7 +23,9 @@ def augmentation_loader(path, label, augmentation=None, swapper=None):
 		image = swapper.load_and_swap_symbol(path)
 
 	else:
-		image = Image.open(path)
+		img_path = os.path.join(os.path.dirname(path), "cached", os.path.basename(path))
+
+		image = Image.open(img_path)
 
 		for i in range(3):
 			try:
@@ -34,10 +36,15 @@ def augmentation_loader(path, label, augmentation=None, swapper=None):
 		image = image.convert('RGB')
 
 	if augmentation:
+
+		trans0 = transforms.Resize(512)
+		image = trans0(image)
+		"""
 		# Shrink the image for augmentation -> Save computation time
 		factor = 512.0 / min(image.size)
 		thumb_size = list(map(lambda x: factor*x, image.size))
 		image.thumbnail(thumb_size, Image.ANTIALIAS)
+		"""
 		try:
 			image = numpy.array(image)
 			augmented_image = augmentation(image=image)
@@ -46,7 +53,7 @@ def augmentation_loader(path, label, augmentation=None, swapper=None):
 		except Exception as e:
 			print(e.__str__())
 
-	trans1 = transforms.Resize(256)
+	trans1 = transforms.Resize(224)
 	trans2 = transforms.CenterCrop(224)
 	trans3 = transforms.ToTensor()
 	image = trans3(trans2(trans1(image)))
@@ -79,7 +86,7 @@ class ImageFileList(data.Dataset):
 
 	def __init__(self, root, flist, transform=None, augmentation=weak_augmentation,
 				flist_reader=default_flist_reader, loader=augmentation_loader, enrich_factor=1, swap=False,
-				swap_probability=0.9):
+				swap_probability=0.9, swap_or_add=0.5):
 		self.enrich_factor = enrich_factor
 		self.root = root
 		self.im_list = flist_reader(flist)
@@ -98,7 +105,7 @@ class ImageFileList(data.Dataset):
 		self.swap_probability = swap_probability
 		self.swapper = None
 		if swap is True:
-			self.swapper = SymbolSwapper(self.org_list)
+			self.swapper = SymbolSwapper(self.org_list, swap_or_add)
 
 	def __getitem__(self, index):
 		impath, target = self.im_list[index]

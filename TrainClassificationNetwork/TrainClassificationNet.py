@@ -80,6 +80,8 @@ def main():
 							help="Freeze the feature extracting layers")
 	argparser.add_argument("--saveIterations", type=int, default=200, help="Save every n iterations")
 	argparser.add_argument("--valIterations", type=int, default=50, help="Validate every n iterations")
+	argparser.add_argument("--swapProbability", type=float, default=0.5,
+	                       help="Probability of Notary Sign Swap (if activated). Inverse Probability to add.")
 
 	args = argparser.parse_args()
 
@@ -106,6 +108,7 @@ def main():
 	freeze_features = args.freezeFeatures
 	print_every_iterations = args.valIterations
 	save_every_iteration = args.saveIterations
+	swap_probability = args.swapProbability
 
 	training_set = f"{SET_ROOT}/{chosen_set}/traindata.txt"
 	validation_set = f"{SET_ROOT}/{chosen_set}/validationdata.txt"
@@ -137,8 +140,8 @@ def main():
 					f"AutoWeight: {auto_weight}\n"
 					f"Partial Freeze: {partial_freeze}\n"
 					f"Load Model: {load_path}\n"
-					f"Freeze Features: {freeze_features}")
-
+					f"Freeze Features: {freeze_features}\n"
+					f"Swap Probability: {swap_probability}\n")
 	"""
 	Prepare the data
 	"""
@@ -289,7 +292,6 @@ def main():
 			logps = model_network.forward(inputs)
 			batch_loss = validation_criterion(logps, labels)
 			validation_loss += batch_loss.item()
-	
 	validation_x_data.append(0)
 	validation_losses.append(validation_loss)
 	validation_loss_curve.set_xdata(validation_x_data)

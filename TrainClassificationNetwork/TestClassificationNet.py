@@ -30,7 +30,7 @@ def main():
 	parsed_args = arg_parser.parse_args()
 	model_name = parsed_args.model_name
 
-	model_type = re.search("\d+_((?:resnet18)|(?:resnet50)|(?:densenet121))", model_name.lower()).group(1)
+	model_type = re.search("((?:resnet18)|(?:resnet50)|(?:densenet121))", model_name.lower()).group(1)
 	model_type = model_type.upper()
 
 	set_name = "full_set" # re.search("^(.*?_set)", model_name).groups(1)
@@ -46,13 +46,12 @@ def main():
 	if model_type == "RESNET18":
 		model_network = models.resnet18()
 		model_network.fc = nn.Sequential(
-			nn.Linear(512, BATCH_SIZE), nn.ReLU(), nn.Linear(BATCH_SIZE, 2), nn.LogSoftmax(dim=1))
+			nn.Linear(512, BATCH_SIZE), nn.ReLU(), nn.Dropout(0.2), nn.Linear(BATCH_SIZE, 2), nn.LogSoftmax(dim=1))
 
 	elif model_type == "RESNET50":
 		model_network = models.resnet50()
 		model_network.fc = nn.Sequential(
-			nn.Linear(2048, BATCH_SIZE), nn.ReLU(), nn.Dropout(0.2), nn.Linear(BATCH_SIZE, 2),
-			nn.LogSoftmax(dim=1))
+			nn.Linear(2048, BATCH_SIZE), nn.ReLU(), nn.Dropout(0.2), nn.Linear(BATCH_SIZE, 2), nn.LogSoftmax(dim=1))
 
 	elif model_type == "DENSENET121":
 		# Pick the model

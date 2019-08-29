@@ -31,7 +31,6 @@ TEST_LOSSES_WEIGHTING = {
 }
 
 
-
 def main():
 	arg_parser = ArgumentParser("Test the Unet on the defined test data")
 	arg_parser.add_argument("model_name", help="pth file to the model")

@@ -13,8 +13,9 @@ REGION_TAG = "GraphicRegion"
 
 
 class SymbolSwapper:
-	def __init__(self, path_to_files):
+	def __init__(self, path_to_files, swap_or_add=0.5):
 		self.__file_paths = list(map(lambda x: x[0], filter(lambda x: x[1] == 1, path_to_files)))
+		self.__swap_or_add = swap_or_add
 		pass
 
 	def get_xml(self, image_path):
@@ -27,18 +28,23 @@ class SymbolSwapper:
 
 	def load_and_swap_symbol(self, org_doc):
 
-		only_add = random.randint(0, 1) == 1
+		only_add = random.randint(0, 100) > (100*self.__swap_or_add)
 
 		org_xml = self.get_xml(org_doc)
 		swap_doc, swap_xml = self.get_random_file(org_doc)
 
-		im = Image.open(org_doc)
+		large_im = Image.open(org_doc)
+		large_dim = large_im.size
+
+		im = Image.open(os.path.join(os.path.dirname(org_doc), "cached", os.path.basename(org_doc)))
 		for i in range(3):
 			try:
 				im.load()
 			except Exception as e:
-				pass
+				print(e.__str__())
 		org_image = im.convert('RGB')
+
+		org_im_scale = im.size[1] / large_dim[1]
 
 		del im
 
@@ -50,24 +56,35 @@ class SymbolSwapper:
 				try:
 					xml_tree = ET.parse(swap_xml)
 				except Exception as e:
-					continue
+					print(e.__str__())
 			root = xml_tree.getroot()
 			elem = root.find('*/{' + SCHEMA + '}' + REGION_TAG)
 			if elem is None:
 				swap_doc, swap_xml = self.get_random_file(org_doc)
 
 		im = Image.open(swap_doc)
+
+		org_dim_swap = im.size
+
+		im = Image.open(os.path.join(os.path.dirname(swap_doc), "cached", os.path.basename(swap_doc)))
+
 		for i in range(3):
 			try:
 				im.load()
 			except Exception as e:
-				pass
+				print(e.__str__())
 
 		swap_image = im.convert('RGB')
+
+		swap_im_scale = im.size[1] / org_dim_swap[1]
+
 		del im
 
 		points = elem.find('{' + SCHEMA + '}' + 'Coords').get('points')
-		fix_pts = tuple(map(lambda x: tuple(map(int, x.split(','))), points.split(' ')))
+
+		fix_pairs = points.split(' ')
+		fix_pts = tuple(map(lambda x: tuple(map(int, x.split(','))), fix_pairs))
+		fix_pts = tuple(map(lambda x: (x[0]*swap_im_scale, x[1]*swap_im_scale), fix_pts))
 
 		mask = Image.new('L', [swap_image.size[0], swap_image.size[1]], 0)
 		ImageDraw.Draw(mask).polygon(fix_pts, fill=1, outline=1, )
@@ -84,19 +101,20 @@ class SymbolSwapper:
 		if elem is None or only_add is True:
 
 			width, height = org_image.size
-			xbb, ybb = (500 + random.randint(0, width-1000), 500 + random.randint(0, height-1000))
+			xbb, ybb = (100 + random.randint(0, width-200), 100 + random.randint(0, height-200))
 			org_image.paste(cropped_sign, (xbb, ybb))
 			pass
 
 		else:
 			points = elem.find('{' + SCHEMA + '}' + 'Coords').get('points')
 			fix_pts = tuple(map(lambda x: tuple(map(int, x.split(','))), points.split(' ')))
+			fix_pts = tuple(map(lambda x: (x[0]*org_im_scale, x[1]*org_im_scale), fix_pts))
 
 			mask = Image.new('L', [swap_image.size[0], swap_image.size[1]], 0)
 			ImageDraw.Draw(mask).polygon(fix_pts, fill=1, outline=1, )
 
 			# Extract notary sign
-			xbb, ybb, hbb, wbb = extract_bounding_box(fix_pts)
+			xbb, ybb, hbb, wbb = tuple(map(int, extract_bounding_box(fix_pts)))
 
 			cropped_sign = cropped_sign.resize((hbb, wbb))
 			org_image.paste(cropped_sign, (xbb, ybb))
