@@ -12,6 +12,7 @@ import skimage.segmentation as seg
 import skimage.filters as filters
 import skimage.morphology as morph
 from PIL import Image
+from TrainSegmentationNetwork.IntersectionOverUnion import calculateIoU
 
 """
 Martin Leipert
@@ -68,6 +69,8 @@ def main():
 
 	ground_truth = np.zeros([4])
 
+	iou = np.zeros((4, 1))
+
 	# Testings
 	for images, masks, image_paths in test_loader:
 		images = images.to(device)
@@ -85,19 +88,23 @@ def main():
 		# Update the losses
 		loss_sum += loss / len(images)
 
-		# plot_result(outputs, images, base_name, images, image_paths)
+		# plot_result(outputs, images, base_name, image_paths)
 
-		this_confusion, gt = get_segmented_area(outputs, masks, images, image_paths)
+		this_confusion, gt, this_iou = get_segmented_area(outputs, masks, images, image_paths)
 		confusion = np.add(confusion, this_confusion)
 		ground_truth = np.add(ground_truth, gt)
+		iou += this_iou
 
+	iou = iou / len(test_loader.dataset.input_images)
 	confusion = confusion / len(test_loader.dataset.input_images)
 	ground_truth = ground_truth / len(test_loader.dataset.input_images)
 	print("Ground truth")
 	print(ground_truth)
 
 	print(f"Overall loss {loss_sum.cpu().item()}")
-	denote_result(base_name, loss_sum, metrics, confusion)
+
+	print("IOU: %.5f\t\t%.5f\t\t%.5f\t\t%.5f\n" % tuple(iou[:, 0]))
+	denote_result(base_name, loss_sum, metrics, confusion, iou)
 
 
 def get_segmented_area(prediction, org_mask, raw_images, image_paths):
@@ -107,6 +114,8 @@ def get_segmented_area(prediction, org_mask, raw_images, image_paths):
 
 	org_mask = org_mask.detach().cpu().numpy()
 	raw_images = raw_images.detach().cpu().numpy()
+
+	iou = calculateIoU(prediction, org_mask)
 
 	class_labels = np.argmax(prediction, axis=1)
 
@@ -168,10 +177,10 @@ def get_segmented_area(prediction, org_mask, raw_images, image_paths):
 		morph.binary_dilation(segmented, out=segmented)
 		org_images.append(segmented)
 		"""
-	return full_confusion, ground_truth
+	return full_confusion, ground_truth, iou
 
 
-def denote_result(base_name, loss, metrics, confusion):
+def denote_result(base_name, loss, metrics, confusion, iou):
 
 	with open(f"Results/{base_name}_test_result.txt", "w+") as open_file:
 		open_file.write(f"Loss on Test_data{loss}\n")
@@ -182,6 +191,9 @@ def denote_result(base_name, loss, metrics, confusion):
 		open_file.write("----- Confusion: -----\n")
 		for i in range(4):
 			open_file.write("%i: %.5f | %.5f \n" % (i, confusion[i, 0], confusion[i, 1]))
+
+		open_file.write("\n")
+		open_file.write("IOU: %.5f\t\t%.5f\t\t%.5f\t\t%.5f\n" % tuple(iou[:, 0]))
 
 
 if __name__ == '__main__':

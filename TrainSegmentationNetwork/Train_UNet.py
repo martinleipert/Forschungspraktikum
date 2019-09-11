@@ -28,7 +28,7 @@ https://github.com/usuyama/pytorch-unet
 
 DIR_ROOT = "/home/martin/Forschungspraktikum/Testdaten/Segmentation_Sets"
 
-BATCH_SIZE = 5
+BATCH_SIZE = 4
 NUM_CLASS = 4
 
 # Precomputed weights for the classes according to their occurence frequency in the set
@@ -132,11 +132,12 @@ def main():
     # Load with self written FIle loader
     training_data = UNetDatasetDynamicMask(file_list_training, region_select=region_select,
                                            augmentation=augmentation_fct)
-    validation_data = UNetDatasetDynamicMask(file_list_validation, augmentation=None, region_select=False)
+    validation_data = UNetDatasetDynamicMask(file_list_validation, augmentation=None, region_select=False,
+                                             random_rescale=False)
 
     # Define the DataLoader
     train_loader = torch.utils.data.DataLoader(training_data, batch_size=BATCH_SIZE)
-    validation_loader = torch.utils.data.DataLoader(validation_data, batch_size=BATCH_SIZE)
+    validation_loader = torch.utils.data.DataLoader(validation_data, batch_size=1)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(device)

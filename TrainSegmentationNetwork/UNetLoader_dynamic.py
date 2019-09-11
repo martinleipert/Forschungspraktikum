@@ -53,7 +53,7 @@ which contain the information where an object is located in binary format
 """
 
 
-def dynamic_mask_loader(path, augmentation=None, region_select=False, p_region_select=0.9):
+def dynamic_mask_loader(path, augmentation=None, region_select=False, p_region_select=0.5, random_rescale=True):
 
 	dir_name = os.path.dirname(path)
 	filename = os.path.basename(path).rsplit('.jpg')[0]
@@ -69,15 +69,23 @@ def dynamic_mask_loader(path, augmentation=None, region_select=False, p_region_s
 
 	org_im = Image.open(path)
 
-	# Load mask
-	image = Image.open(os.path.join(os.path.dirname(path), "cached", os.path.basename(path)))
-	image.load()
-	image = image.convert('RGB')
+	if region_select:
+		select_region = random.random() < p_region_select
+		image = Image.open(path)
+		image.load()
+		image = image.convert('RGB')
+		scale = image.size[1] / org_im.size[1]
 
-	scale = image.size[1] / org_im.size[1]
+	else:
+
+		# Load mask
+		image = Image.open(os.path.join(os.path.dirname(path), "cached", os.path.basename(path)))
+		image.load()
+		image = image.convert('RGB')
+		scale = image.size[1] / org_im.size[1]
 
 	# Contruct mask array
-	mask_array = np.int8(np.zeros(list([scale*image.size[1], image.size[0]]) + [len(REGION_TYPES)]))
+	mask_array = np.int8(np.zeros(list([image.size[1], image.size[0]]) + [len(REGION_TYPES)]))
 
 	all_els = []
 
@@ -106,9 +114,7 @@ def dynamic_mask_loader(path, augmentation=None, region_select=False, p_region_s
 
 	# If a random region get's masked out
 	if region_select:
-		randint = random.randint(1, 100)
-
-		if randint < 75:
+		if select_region:
 			el_idx = random.randint(0, len(all_els)-1)
 			element = all_els[el_idx]
 			points = element.find(ns + 'Coords').get('points')
@@ -145,8 +151,15 @@ def dynamic_mask_loader(path, augmentation=None, region_select=False, p_region_s
 	# Augmentation-independent Transformation -> TO Tensor
 	trans3 = TF.ToTensor()
 
-	trans1 = TF.Resize(256)
-	trans2 = TF.CenterCrop(224)
+	# Rnadom Rescale means we are training
+	if not random_rescale:
+		# Resize for 2^n -> Vielfache von 16
+		ratio = tuple(np.floor(np.divide(image.size, 16)))
+		trans1 = TF.RandomResizedCrop(512, ratio=ratio, interpolation=2)
+
+
+	else:
+		trans1 = TF.RandomResizedCrop(256, scale=(0.2, 1), ratio=(1, 1), interpolation=2)
 
 	if augmentation is not None:
 		trans4 = TF.Resize(512)
@@ -167,8 +180,8 @@ def dynamic_mask_loader(path, augmentation=None, region_select=False, p_region_s
 		image = Image.fromarray(transformed['image'])
 		mask_array = transformed['mask']
 
-	trafo_img = trans3(trans2(trans1(image)))
-	mask_array = [np.array(trans2(trans1(Image.fromarray(mask_array[:, :, i])))) for i in range(np.shape(mask_array)[2])]
+	trafo_img = trans3(trans1(image))
+	mask_array = [np.array(trans1(Image.fromarray(mask_array[:, :, i]))) for i in range(np.shape(mask_array)[2])]
 	trafo_mask = torch.tensor(np.float64(mask_array)).to('cuda')
 
 	return trafo_img, trafo_mask
@@ -181,7 +194,7 @@ A Dataset containing data from a list which is built of tuples:
 
 class UNetDatasetDynamicMask(Dataset):
 	def __init__(self, file_path, transform=None, data_set_loader=dynamic_mask_loader,
-				 region_select=False, augmentation=None):
+				 region_select=False, augmentation=None, random_rescale=True):
 		self.input_images = []
 		self.data_set_loader = data_set_loader
 		self.augment = False
@@ -190,6 +203,7 @@ class UNetDatasetDynamicMask(Dataset):
 			self.augment = True
 			self.augmentation = augmentation()
 		self.region_select = region_select
+		self.random_rescale = random_rescale
 
 		with open(file_path) as open_file:
 			lines = open_file.read()
@@ -210,7 +224,8 @@ class UNetDatasetDynamicMask(Dataset):
 	def __getitem__(self, idx):
 		image_path = self.input_images[idx]
 
-		image, mask = self.data_set_loader(image_path, region_select=self.region_select, augmentation=self.augmentation)
+		image, mask = self.data_set_loader(image_path, region_select=self.region_select, augmentation=self.augmentation,
+		                                   random_rescale=self.random_rescale)
 
 		return [image, mask, image_path]
 
