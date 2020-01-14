@@ -5,17 +5,18 @@ def calculateIoU(prediction, target):
 
 	result = numpy.zeros((4, 1))
 
-	for j in range(prediction.shape[0]):
-		labels = numpy.argmax(prediction[j, :, :, :], axis=0)
 
+	for j in range(prediction.shape[0]):
+		this_prediction = numpy.moveaxis(prediction[0, :, :, :], 0, 2)
+		labels = numpy.argmax(this_prediction, axis=2)
 		for i in range(4):
 			this_prediction = numpy.where(labels == i, 1, 0)
 
-			intersection = numpy.logical_and(this_prediction, target[:, i, :, :])
-			union = numpy.logical_or(this_prediction, target[:, i, :, :])
+			intersection = numpy.logical_and(this_prediction, target[j, i, :, :])
+			union = numpy.logical_or(this_prediction, target[j, i, :, :])
 
-			intersection = intersection.sum().sum()
-			union = union.sum().sum()
+			intersection = intersection.sum()
+			union = union.sum()
 			iou = intersection / union
 
 			iou = numpy.nan_to_num(iou, 0)

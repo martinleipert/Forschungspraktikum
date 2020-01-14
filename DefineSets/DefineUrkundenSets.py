@@ -56,6 +56,9 @@ def main():
 			if not file.lower().endswith('.jpg'):
 				continue
 
+			if int(file.lower().split("_")[0]) > 400:
+				continue
+
 			# Get the xml file
 			dir_name = os.path.dirname(file_path)
 			filename = os.path.basename(file_path).rsplit('.jpg')[0]

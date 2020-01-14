@@ -67,9 +67,12 @@ def main():
 	# argparser.add_argument("--epochs", type=int, default=3, help="Number of epochs")
 	argparser.add_argument("--lrStep", type=int, default=150, help="Step Learning Rate after n iterations")
 	argparser.add_argument("--breakIterations", type=int, default=750, help="Break after n iterations")
+	argparser.add_argument("--undersample", action="store_true", default=False,
+	                       help="Undersample as counter-strategy for class imbalance")
 	argparser.add_argument("--enrichFactor", type=int, default=1,
 							help="Factor to increase drawing rate of notary documents")
 	argparser.add_argument("--swapSign", action='store_true', default=False, help="Augment by swapping notary sign")
+	argparser.add_argument("--noAdd", action="store_true", default=False, help="Augment by only swapping notary sign (not adding)")
 	argparser.add_argument("--autoWeightOff", action="store_false", default=True, help="Compensate drawing rate by weighting")
 	argparser.add_argument("--batchSize", type=int, default=128, help="Batch size for Training")
 	argparser.add_argument("--partialFreeze", action="store_true", default=False,
@@ -82,6 +85,8 @@ def main():
 	argparser.add_argument("--valIterations", type=int, default=50, help="Validate every n iterations")
 	argparser.add_argument("--swapProbability", type=float, default=0.5,
 	                       help="Probability of Notary Sign Swap (if activated). Inverse Probability to add.")
+	argparser.add_argument("--useThresholding", action="store_true", default=False,
+	                       help="Use Thresholding to counter class imbalance")
 
 	args = argparser.parse_args()
 
@@ -109,6 +114,9 @@ def main():
 	print_every_iterations = args.valIterations
 	save_every_iteration = args.saveIterations
 	swap_probability = args.swapProbability
+	undersample = args.undersample
+	no_add = args.noAdd
+	use_thresholding = args.useThresholding
 
 	training_set = f"{SET_ROOT}/{chosen_set}/traindata.txt"
 	validation_set = f"{SET_ROOT}/{chosen_set}/validationdata.txt"
@@ -129,6 +137,7 @@ def main():
 					f"Training on {chosen_set}\n"
 					f"Learning Rate: {learning_rate}\n"
 					f"Batch size: {batch_size}\n"
+					f"Undersample: {undersample} \n"
 					# f"Epochs: {epochs}\n"
 					f"Learning Rate Step Size: {lr_step_size}\n"
 					f"LEarning Rate Decay: {lr_gamma}\n"
@@ -141,6 +150,8 @@ def main():
 					f"Partial Freeze: {partial_freeze}\n"
 					f"Load Model: {load_path}\n"
 					f"Freeze Features: {freeze_features}\n"
+					f"SwapSign: {swap_sign}\n"
+					f"NoAdd: {no_add}\n"
 					f"Swap Probability: {swap_probability}\n")
 	"""
 	Prepare the data
@@ -156,7 +167,7 @@ def main():
 
 	# Load with self written FIle loader
 	training_data = ImageFileList('.', training_set, enrich_factor=drawing_factor, augmentation=augmentation_fct,
-									swap=swap_sign)
+									swap=swap_sign, undersample=undersample, swap_or_add= 1 if no_add else 0.5)
 	validation_data = ImageFileList('.', validation_set, augmentation=None)
 
 	# Define the DataLoader
@@ -302,7 +313,6 @@ def main():
 
 	t0 = time.time()
 	__LOGGER__.info(
-		"##########################\n"
 		"#    Start Training      #\n"
 		"##########################\n"
 	)
@@ -332,8 +342,13 @@ def main():
 
 			optimizer.zero_grad()
 			logps = model_network(inputs)
-			loss = training_criterion(logps, labels)
-			loss.backward()
+
+			if use_thresholding is True:
+				loss = training_criterion(logps, labels)
+
+			else:
+				loss = training_criterion(logps, labels)
+				loss.backward()
 			optimizer.step()
 
 			current_loss = loss.detach().item()

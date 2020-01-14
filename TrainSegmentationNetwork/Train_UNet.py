@@ -63,7 +63,7 @@ def main():
     arg_parser.add_argument("DICE", type=float, help="Weight of the dice loss function")
     arg_parser.add_argument("FOCAL", type=float, help="Weight of the focal loss function")
     arg_parser.add_argument("AUGMENTATION", type=str, help="Selected Augmentation: 'NONE', 'WEAK', 'MODERATE', 'HEAVY'")
-    arg_parser.add_argument("--learningRate", type=float, default=1e-3)
+    arg_parser.add_argument("--learningRate", type=float, default=5e-3)
     arg_parser.add_argument("--epochs", type=int, default=60)
     arg_parser.add_argument("--lrStep", type=int, default=10)
     arg_parser.add_argument("--lrGamma", type=float, default=0.3)
@@ -137,7 +137,7 @@ def main():
 
     # Define the DataLoader
     train_loader = torch.utils.data.DataLoader(training_data, batch_size=BATCH_SIZE)
-    validation_loader = torch.utils.data.DataLoader(validation_data, batch_size=1)
+    validation_loader = torch.utils.data.DataLoader(validation_data, batch_size=BATCH_SIZE)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(device)

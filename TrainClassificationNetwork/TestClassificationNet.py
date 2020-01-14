@@ -19,16 +19,19 @@ Denote missclassifications
 """
 
 
-BATCH_SIZE = 32
+BATCH_SIZE = 20
 NUM_CLASSES = 2
 
 
 def main():
 	arg_parser = ArgumentParser("Evaluate a model")
 	arg_parser.add_argument("model_name", help="name of the model")
+	arg_parser.add_argument("batch_size", type=int)
+
 
 	parsed_args = arg_parser.parse_args()
 	model_name = parsed_args.model_name
+	BATCH_SIZE = parsed_args.batch_size
 
 	model_type = re.search("((?:resnet18)|(?:resnet50)|(?:densenet121))", model_name.lower()).group(1)
 	model_type = model_type.upper()

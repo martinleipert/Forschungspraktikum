@@ -14,6 +14,8 @@ from TrainClassificationNetwork.SwapAddNotarySymbol import SymbolSwapper
 import torch
 import numpy
 
+from numpy.random import choice, shuffle
+
 Image.LOAD_TRUNCATED_IMAGES = True
 
 
@@ -86,15 +88,22 @@ class ImageFileList(data.Dataset):
 
 	def __init__(self, root, flist, transform=None, augmentation=weak_augmentation,
 				flist_reader=default_flist_reader, loader=augmentation_loader, enrich_factor=1, swap=False,
-				swap_probability=0.9, swap_or_add=0.5):
+				swap_probability=0.9, swap_or_add=0.5, undersample=False):
 		self.enrich_factor = enrich_factor
 		self.root = root
 		self.im_list = flist_reader(flist)
 		self.org_list = self.im_list
-		if enrich_factor <= 1:
-			self.im_list = self.im_list
+
+		if not undersample:
+			if enrich_factor <= 1:
+				self.im_list = self.im_list
+			else:
+				self.im_list = ImageFileList.augment_imlist(self.im_list, enrich_factor)
+
 		else:
-			self.im_list = ImageFileList.augment_imlist(self.im_list, enrich_factor)
+			self.im_list = ImageFileList.undersample_imlist(self.im_list)
+
+
 		self.transform = transform
 		self.loader = loader
 		if augmentation is not None:
@@ -136,6 +145,25 @@ class ImageFileList(data.Dataset):
 		random.shuffle(enriched_list)
 
 		return enriched_list
+
+
+	@classmethod
+	def undersample_imlist(cls, im_list, class_to_undersample = 0):
+
+		list_0 = list(filter(lambda x: x[1] == class_to_undersample, im_list))
+		list_1 = list(filter(lambda x: x[1] != class_to_undersample, im_list))
+
+		number_of_indices = len(list_1)
+
+		indices_0 = list(range(len(list_0)))
+
+		undersampled_i = choice(indices_0, number_of_indices)
+
+		undersampled_list = list(map(lambda x: list_0[x], undersampled_i)) + list_1
+
+		shuffle(undersampled_list)
+
+		return undersampled_list
 
 
 if __name__ == '__main__':

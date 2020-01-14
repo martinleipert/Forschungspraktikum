@@ -13,6 +13,7 @@ import skimage.filters as filters
 import skimage.morphology as morph
 from PIL import Image
 from TrainSegmentationNetwork.IntersectionOverUnion import calculateIoU
+from torch.nn.functional import softmax
 
 """
 Martin Leipert
@@ -21,7 +22,7 @@ martin.leipert@fau.de
 """
 
 
-BATCH_SIZE = 5
+BATCH_SIZE = 1
 
 NUM_CLASSES = 4
 
@@ -40,7 +41,7 @@ def main():
 
 	model_name = parsed_args.model_name
 
-	set_name = "fullset"
+	set_name = "small_set"
 
 	file_list_test = "/home/martin/Forschungspraktikum/Testdaten/Segmentation_Sets/%s/test.txt" % set_name
 
@@ -88,7 +89,7 @@ def main():
 		# Update the losses
 		loss_sum += loss / len(images)
 
-		# plot_result(outputs, images, base_name, image_paths)
+		plot_result(outputs, images, base_name, image_paths)
 
 		this_confusion, gt, this_iou = get_segmented_area(outputs, masks, images, image_paths)
 		confusion = np.add(confusion, this_confusion)
@@ -110,7 +111,9 @@ def main():
 def get_segmented_area(prediction, org_mask, raw_images, image_paths):
 
 	prediction = torch.sigmoid(prediction.double())
+	prediction = softmax(prediction, 1)
 	prediction = prediction.cpu().numpy()
+
 
 	org_mask = org_mask.detach().cpu().numpy()
 	raw_images = raw_images.detach().cpu().numpy()
@@ -159,8 +162,8 @@ def get_segmented_area(prediction, org_mask, raw_images, image_paths):
 	# Missclassified area:
 	subtraction = new_mask - org_mask
 	subtraction = np.where(subtraction < 0, 0, subtraction)
-	missclassified = subtraction.sum(axis=0).sum(axis=0)
 
+	missclassified = subtraction.sum(axis=0).sum(axis=0)
 	org_images = []
 
 	for raw_im in raw_images:
@@ -176,7 +179,8 @@ def get_segmented_area(prediction, org_mask, raw_images, image_paths):
 		segmented = filters.threshold_otsu(image)
 		morph.binary_dilation(segmented, out=segmented)
 		org_images.append(segmented)
-		"""
+
+	"""
 	return full_confusion, ground_truth, iou
 
 

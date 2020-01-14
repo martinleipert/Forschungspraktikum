@@ -2,9 +2,19 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="65b7f743-4793-47fe-a0fb-442b42975d38" name="Default" comment="">
+      <change afterPath="$PROJECT_DIR$/../OwnDHSegment/dhSegment.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../TrainClassificationNetwork/Results/Summary/Auswertung.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../TrainSegmentationNetwork/Results/EvalResults.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../UNet/dhSegment.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../TrainClassificationNetwork/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../TrainClassificationNetwork/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../TrainClassificationNetwork/Experiment_Small_Net.py" beforeDir="false" afterPath="$PROJECT_DIR$/../TrainClassificationNetwork/Experiment_Small_Net.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DefineUrkundenSets.py" beforeDir="false" afterPath="$PROJECT_DIR$/DefineUrkundenSets.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../TrainClassificationNetwork/DataSetLoader.py" beforeDir="false" afterPath="$PROJECT_DIR$/../TrainClassificationNetwork/DataSetLoader.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../TrainClassificationNetwork/TestClassificationNet.py" beforeDir="false" afterPath="$PROJECT_DIR$/../TrainClassificationNetwork/TestClassificationNet.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../TrainClassificationNetwork/TrainClassificationNet.py" beforeDir="false" afterPath="$PROJECT_DIR$/../TrainClassificationNetwork/TrainClassificationNet.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../TrainSegmentationNetwork/IntersectionOverUnion.py" beforeDir="false" afterPath="$PROJECT_DIR$/../TrainSegmentationNetwork/IntersectionOverUnion.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../TrainSegmentationNetwork/TestUNetOnData.py" beforeDir="false" afterPath="$PROJECT_DIR$/../TrainSegmentationNetwork/TestUNetOnData.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../TrainSegmentationNetwork/Train_UNet.py" beforeDir="false" afterPath="$PROJECT_DIR$/../TrainSegmentationNetwork/Train_UNet.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../TrainSegmentationNetwork/UNetLoader_dynamic.py" beforeDir="false" afterPath="$PROJECT_DIR$/../TrainSegmentationNetwork/UNetLoader_dynamic.py" afterDir="false" />
     </list>
     <ignored path="DefineSets.iws" />
     <ignored path=".idea/workspace.xml" />
@@ -23,18 +33,6 @@
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
       <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/DefineSets.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="945">
-              <caret line="66" column="55" selection-start-line="66" selection-start-column="32" selection-end-line="66" selection-end-column="55" />
-              <folding>
-                <element signature="e#0#12#0" expanded="true" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/DefineSets_Flexible.py">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="492">
@@ -43,11 +41,11 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/FixDataset.py">
+      <file pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/DefineUrkundenSets.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="30">
-              <caret line="3" column="107" selection-start-line="3" selection-start-column="84" selection-end-line="3" selection-end-column="107" />
+            <state relative-caret-position="442">
+              <caret line="58" column="32" lean-forward="true" selection-start-line="58" selection-start-column="32" selection-end-line="58" selection-end-column="32" />
               <folding>
                 <element signature="e#0#9#0" expanded="true" />
               </folding>
@@ -82,6 +80,7 @@
         <option value="$PROJECT_DIR$/DefineSets.py" />
         <option value="$PROJECT_DIR$/FixDataset.py" />
         <option value="$PROJECT_DIR$/DefineSets_Flexible.py" />
+        <option value="$PROJECT_DIR$/DefineUrkundenSets.py" />
       </list>
     </option>
   </component>
@@ -96,12 +95,22 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
-      <pane id="ProjectPane" />
       <pane id="Scope" />
+      <pane id="ProjectPane">
+        <subPane>
+          <expand>
+            <path>
+              <item name="DefineSets" type="b2602c69:ProjectViewProjectNode" />
+              <item name="DefineSets" type="462c0819:PsiDirectoryNode" />
+            </path>
+          </expand>
+          <select />
+        </subPane>
+      </pane>
     </panes>
   </component>
   <component name="PropertiesComponent">
-    <property name="last_opened_file_path" value="$PROJECT_DIR$/.." />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
     <property name="settings.editor.selected.configurable" value="preferences.externalTools" />
     <property name="settings.editor.splitter.proportion" value="0.2" />
   </component>
@@ -233,8 +242,9 @@
   </component>
   <component name="ToolWindowManager">
     <frame x="0" y="0" width="1920" height="1042" extended-state="6" />
+    <editor active="true" />
     <layout>
-      <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.3811281" />
+      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.3811281" />
       <window_info id="Structure" order="1" weight="0.25" />
       <window_info id="Favorites" order="2" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="0" />
@@ -246,7 +256,7 @@
       <window_info anchor="bottom" id="TODO" order="6" />
       <window_info anchor="bottom" id="Version Control" order="7" />
       <window_info anchor="bottom" id="Python Console" order="8" />
-      <window_info anchor="bottom" id="Terminal" order="9" />
+      <window_info active="true" anchor="bottom" id="Terminal" order="9" visible="true" weight="0.32932165" />
       <window_info anchor="bottom" id="Event Log" order="10" side_tool="true" />
       <window_info anchor="right" id="Commander" order="0" weight="0.4" />
       <window_info anchor="right" id="Ant Build" order="1" weight="0.25" />
@@ -270,23 +280,12 @@
     </breakpoint-manager>
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/DefineSets.py">
+    <entry file="file://$PROJECT_DIR$/DefineSets.py" />
+    <entry file="file://$PROJECT_DIR$/FixDataset.py" />
+    <entry file="file://$PROJECT_DIR$/DefineSets_Flexible.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="945">
-          <caret line="66" column="55" selection-start-line="66" selection-start-column="32" selection-end-line="66" selection-end-column="55" />
-          <folding>
-            <element signature="e#0#12#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/FixDataset.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="30">
-          <caret line="3" column="107" selection-start-line="3" selection-start-column="84" selection-end-line="3" selection-end-column="107" />
-          <folding>
-            <element signature="e#0#9#0" expanded="true" />
-          </folding>
+        <state relative-caret-position="492">
+          <caret line="118" column="26" selection-start-line="118" selection-start-column="26" selection-end-line="118" selection-end-column="26" />
         </state>
       </provider>
     </entry>
@@ -297,10 +296,13 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/DefineSets_Flexible.py">
+    <entry file="file://$PROJECT_DIR$/DefineUrkundenSets.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="492">
-          <caret line="118" column="26" selection-start-line="118" selection-start-column="26" selection-end-line="118" selection-end-column="26" />
+        <state relative-caret-position="442">
+          <caret line="58" column="32" lean-forward="true" selection-start-line="58" selection-start-column="32" selection-end-line="58" selection-end-column="32" />
+          <folding>
+            <element signature="e#0#9#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>

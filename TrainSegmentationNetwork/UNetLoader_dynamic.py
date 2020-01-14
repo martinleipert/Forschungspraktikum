@@ -151,15 +151,18 @@ def dynamic_mask_loader(path, augmentation=None, region_select=False, p_region_s
 	# Augmentation-independent Transformation -> TO Tensor
 	trans3 = TF.ToTensor()
 
-	# Rnadom Rescale means we are training
+	# Random Rescale means we are training
 	if not random_rescale:
-		# Resize for 2^n -> Vielfache von 16
-		ratio = tuple(np.floor(np.divide(image.size, 16)))
-		trans1 = TF.RandomResizedCrop(512, ratio=ratio, interpolation=2)
+		"""
+		
+		"""
 
+		# Resize for 2^n -> Vielfache von 16
+
+		trans1 = TF.RandomResizedCrop(256, scale=(1, 1), ratio=(1, 1), interpolation=2)
 
 	else:
-		trans1 = TF.RandomResizedCrop(256, scale=(0.2, 1), ratio=(1, 1), interpolation=2)
+		trans1 = TF.CenterCrop(256)
 
 	if augmentation is not None:
 		trans4 = TF.Resize(512)
