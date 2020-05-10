@@ -40,7 +40,7 @@ def weak_augmentation():
 	effects = RandomShadow(p=0.2)
 
 	# Contrast and lighting changes are frequent
-	brightness_contrast = RandomBrightnessContrast(brightness_limit=0.3, contrast_limit=0.15, p=0.4)
+	brightness_contrast = RandomBrightnessContrast(brightness_limit=0.15, contrast_limit=0.15, p=0.2)
 
 	# HSV varies a little over the documents
 	color = OneOf([
