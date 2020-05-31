@@ -75,8 +75,8 @@ class DownConv(nn.Module):
 			self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
 
 	def forward(self, x):
-		x = self.batch_norm1(F.relu(self.conv1(x)))
-		x = self.batch_norm2(F.relu(self.conv2(x)))
+		x = F.relu(self.batch_norm1(self.conv1(x)))
+		x = F.relu(self.batch_norm2(self.conv2(x)))
 		before_pool = x
 		if self.pooling:
 			x = self.pool(x)
@@ -123,8 +123,8 @@ class UpConv(nn.Module):
 			x = torch.cat((from_up, from_down), 1)
 		else:
 			x = from_up + from_down
-		x = self.batch_norm1(F.relu(self.conv1(x)))
-		x = self.batch_norm2(F.relu(self.conv2(x)))
+		x = F.relu(self.batch_norm1(self.conv1(x)))
+		x = F.relu(self.batch_norm2(self.conv2(x)))
 		return x
 
 
